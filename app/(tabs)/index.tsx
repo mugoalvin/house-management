@@ -1,74 +1,87 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import { Alert, SafeAreaView, useColorScheme, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import CustomizedText from '@/component/CustomizedText'
+import { Button, useTheme } from 'react-native-paper'
+import { getDashboardStyle } from '../dashboard'
+import { useSQLiteContext } from 'expo-sqlite'
+import Card, { getCardStyle } from '@/component/Card'
+import ConfirmView from '@/component/ConfirmView'
+import { tenantProps } from '@/assets/tenants'
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const index = () => {
+	const db = useSQLiteContext()
+	const theme = useTheme()
+	const colorScheme = useColorScheme() || 'dark'
+	const style = getDashboardStyle(colorScheme, theme)
+	const cardStyle = getCardStyle(colorScheme, theme)
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+	const [tenant, setTenant] = useState<tenantProps>({} as tenantProps)
+
+	const fetchTenant = async () => {
+		try {
+			const tenant: tenantProps = await db.getFirstAsync('SELECT * FROM tenants WHERE houseId = 100') || {} as tenantProps
+			setTenant(tenant)
+		}
+		catch (error) {
+			Alert.alert('Error Fetching', `${error}`)
+			return {} as tenantProps
+		}
+	}
+
+	const insertTenant = async () => {
+		try {
+			const insert = await db.runAsync('INSERT INTO tenants(houseId, tenantName, contactInfo, moveInDate, occupation, rentOwed, depositOwed) VALUES(?, ?, ?, ?, ?, ?, ?)', [100, 'John Doe', '012345', '30/11/2000', 'Nurse', 5000, 5000])
+			insert.changes == 1 && Alert.alert('Done', 'New tenant inserted successfully')
+		}
+		catch (error) {
+			Alert.alert('Error Inserting', `${error}`)
+		}
+	}
+
+	const deleteTenant = async () => {
+		try {
+			const remove = await db.runAsync('DELETE FROM tenants WHERE houseId = 100')
+			remove.changes == 1 && Alert.alert('Done', 'Tenant deleted successfully')
+		}
+		catch (error) {
+			Alert.alert('Error Deleting', `${error}`)
+		}
+	}
+
+	return (
+		<SafeAreaView style={style.scrollView}>
+			<View style={style.view}>
+				<View style={style.row}>
+					<Card>
+						<View>
+							<CustomizedText textStyling={cardStyle.cardHeaderText}>Read</CustomizedText>
+							<Button children="Fetch" mode='text' onPress={fetchTenant} />
+						</View>
+						{
+							Object.entries(tenant).map(([key, value]) => (
+								<ConfirmView keyHolder={key} value={`${value.toString()}`} />
+							))
+						}
+					</Card>
+				</View>
+
+				<View style={style.row}>
+					<Card>
+						<CustomizedText textStyling={cardStyle.cardHeaderText}>Insert</CustomizedText>
+						<Button children="Insert" mode='text' onPress={insertTenant} />
+					</Card>
+				</View>
+
+				<View style={style.row}>
+					<Card>
+						<CustomizedText textStyling={cardStyle.cardHeaderText}>Delete</CustomizedText>
+						<Button children="Delete" mode='text' onPress={deleteTenant} />
+					</Card>
+				</View>
+
+			</View>
+		</SafeAreaView>
+	)
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+export default index
