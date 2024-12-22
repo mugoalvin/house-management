@@ -83,7 +83,7 @@ export default function RootLayout() {
 							ref={drawer}
 							drawerWidth={300}
 							drawerPosition={drawerPosition}
-							renderNavigationView={() => <DrawerDash changeDrawerPosition={changeDrawerPosition}  />}
+							renderNavigationView={() => <DrawerDash toggleDrawer={toggleDrawer} changeDrawerPosition={changeDrawerPosition}  />}
 							onDrawerClose={() => setIsDrawerOpen(false)}
 							// drawerBackgroundColor={colorScheme == 'dark' ? theme.colors.surface : theme.colors.secondaryContainer}>
 							drawerBackgroundColor={colorScheme == 'dark' ? theme.colors.surface : '#e6e6e6'}>

@@ -4,7 +4,7 @@ import { router } from 'expo-router'
 import { Avatar, Button, Divider, Icon, List, Menu, useTheme } from 'react-native-paper'
 
 type houseObject = {
-	houseId: number
+	houseId: string
 	tenantId: number
 	houseNumber: string
 	tenantName: string
@@ -17,7 +17,7 @@ type HouseInListProps = {
 	plotName: string
 	house: houseObject
 	setModalVisibility: (state: boolean) => void
-	setSelectedHouseId: (houseId: number) => void
+	setSelectedHouseId: (houseId: string) => void
 }
 
 

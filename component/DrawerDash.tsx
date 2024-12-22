@@ -7,12 +7,14 @@ import { Divider } from 'react-native-paper'
 import { signOut } from 'firebase/auth' 
 import { firebaseAuth } from '@/firebaseConfig'
 import { router } from 'expo-router'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface DrawerDashProps {
 	changeDrawerPosition: () => void
+	toggleDrawer: () => void
 }
 
-function DrawerDash ({changeDrawerPosition} : DrawerDashProps) {
+function DrawerDash ({changeDrawerPosition, toggleDrawer} : DrawerDashProps) {
 	const theme = useTheme()
 	const colorScheme = useColorScheme() || 'dark'
 	const [isSwitchOn, setIsSwitchOn] = useState(colorScheme == 'dark' ? true : false)
@@ -25,8 +27,10 @@ function DrawerDash ({changeDrawerPosition} : DrawerDashProps) {
 	}
 
 	const logOut = () => {
+		toggleDrawer()
 		signOut(firebaseAuth)
-			.then(() => {
+			.then( async () => {
+				await AsyncStorage.removeItem('userId')
 				router.dismissAll()
 			})
 			.catch(error => {

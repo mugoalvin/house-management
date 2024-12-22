@@ -2,10 +2,11 @@ import CustomizedText from '@/component/CustomizedText';
 import { router, useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, useColorScheme, StatusBar } from 'react-native';
-import { Button, MD3Theme, Snackbar, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, MD3Theme, Snackbar, useTheme } from 'react-native-paper';
 import { getHousePageStyles } from './housePage';
 import { firebaseAuth } from '@/firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Login = () => {
 	const auth = firebaseAuth
@@ -16,6 +17,8 @@ const Login = () => {
 	
 	const [email, setEmail] = useState<string>()
 	const [password, setPassword] = useState<string>()
+
+	const [loginButtonPressed, setLoginButtonPressed] = useState<boolean>(false)
 
 	const [snackbarMsg, setSnackbarMsg] = useState<string>()
 	const [snackBarVisibility, setSnackBarVisibility] = useState(false)
@@ -29,23 +32,26 @@ const Login = () => {
 	}
 
 	const handleLogin = () => {
+		setLoginButtonPressed(true)
 		if(email == undefined || password == undefined) {
 			setSnackbarMsg('Fill in both Input Fields')
 			setSnackBarVisibility(true)
+			setLoginButtonPressed(false)
 			return
 		}
 
 		signInWithEmailAndPassword(firebaseAuth, email, password)
-			.then((userCred) => {
+			.then( async (userCred) => {
+				await AsyncStorage.setItem('userId', userCred.user.uid)
 				router.push({
 					pathname: '/dashboard',
-					params: {
-						userId: userCred.user.uid
-					}
 				})
 			})
 			.catch((error) => {
 				console.error('Failed to sign in: ' + error)
+			})
+			.finally(() => {
+				setLoginButtonPressed(false)
 			})
 	}
 
@@ -96,7 +102,9 @@ const Login = () => {
 
 				{/* Login Button */}
 				<TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-					<CustomizedText textStyling={styles.loginText}>Login</CustomizedText>
+					{
+						loginButtonPressed ? <ActivityIndicator /> : <CustomizedText textStyling={styles.loginText}>Login</CustomizedText>
+					}
 				</TouchableOpacity>
 
 				{/* OR Separator */}

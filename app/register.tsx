@@ -6,9 +6,10 @@ import { ActivityIndicator, MD3Theme, Snackbar, useTheme } from 'react-native-pa
 import { getAuthStyle } from './login'
 import { getHousePageStyles } from './housePage'
 
-import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth'
+import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail, onAuthStateChanged } from 'firebase/auth'
 import { firestore, firebaseAuth } from '@/firebaseConfig'
 import { doc, setDoc } from 'firebase/firestore'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const Register = () => {
 	const auth = firebaseAuth
@@ -31,6 +32,8 @@ const Register = () => {
 
 	const [buttonPressed, setButtonPressed] = useState<boolean>(false)
 
+	const [user, setUser] = useState(null)
+
 	const openLogin = () => {
 		router.push({
 			pathname: '/login'
@@ -40,7 +43,7 @@ const Register = () => {
 
 	const saveUserData = async (userId: string) => {
 		// const docRef = await addDoc(collection(firestore, '/users'), {
-		const docRef = await setDoc(doc(firestore, '/users', `${firstName} ${lastName}`), {
+		await setDoc(doc(firestore, '/users', userId), {
 			firstName: firstName,
 			lastName: lastName,
 			contactInfo: phoneNumber,
@@ -76,14 +79,12 @@ const Register = () => {
 		}
 
 		createUserWithEmailAndPassword(auth, email, password)
-			.then((userCred) => {
+			.then( async(userCred) => {
 				userId = userCred.user.uid
 				saveUserData(userId)
+				await AsyncStorage.setItem('userId', userId)
 				router.push({
 					pathname: '/dashboard',
-					params: {
-						userId: userId
-					}
 				})
 			})
 			.catch((error) => {

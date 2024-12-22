@@ -6,6 +6,10 @@ import { useSQLiteContext } from 'expo-sqlite'
 import ModalButtons from './ModalButtons'
 import { getModalStyle } from './CustomModal'
 import ConfirmView from './ConfirmView'
+import { plotsProps } from '@/assets/plots'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { firestore } from '@/firebaseConfig'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface FormData {
 	plotName: string
@@ -20,7 +24,7 @@ interface FormData {
 }
 
 interface EditPlotProps {
-	plotId: number
+	plotId: number | string
 	plotUpdated: boolean
 	closePlotModal: () => void
 	setPlotUpdated: (state: boolean) => void
@@ -29,12 +33,14 @@ interface EditPlotProps {
 }
 
 const EditPlot = ({plotId, plotUpdated, closePlotModal, setPlotUpdated, setSnackBarMsg, onToggleSnackBar} : EditPlotProps) => {
-	const colorScheme = useColorScheme() || 'dark'
 	const theme = useTheme()
-	const db = useSQLiteContext()
+	const colorScheme = useColorScheme() || 'dark'
 	const maxRenderSteps = 4
 	const [currentStep, setCurrentStep] = useState<number>(1)
-	const [plotData, setPlotData ] = useState<any | undefined>(undefined)
+	const [userId, setUserId] = useState<string>('')
+
+	const [firestorePlotData, setFirestorePlotData ] = useState<plotsProps>()
+
 	const [formData, setFormData] = useState<FormData>({
 		plotName: '',
 		numberOfHouses: 0,
@@ -42,32 +48,50 @@ const EditPlot = ({plotId, plotUpdated, closePlotModal, setPlotUpdated, setSnack
 		rentPrice: 0,
 		details: ''
 	})
-	
+
 	const getInitialData = async () => {
-		const results: any = await db.getFirstAsync('SELECT * FROM plots WHERE id = ?', [plotId])
-		setPlotData(results)
+		// @ts-ignore
+		const docSnap = await getDoc(doc(firestore, `/users/${userId}/plots`, plotId))
+		setFirestorePlotData(docSnap.data() as plotsProps)
+	}
+
+	const getUserId = async () => {
+		await AsyncStorage.getItem('userId')
+			.then((id) => {
+				setUserId(id || 'No ID')
+			})
 	}
 
 	useEffect(() => {
-		getInitialData()
+		getUserId()
 	}, [])
+
+	useEffect(() => {
+		getInitialData()
+	}, [userId])
 	
 	useEffect(() => {
-		if(plotData) {
+		if(firestorePlotData) {
 			setFormData({
-				plotName: plotData.plotName,
-				numberOfHouses: plotData.numberOfHouses,
-				houseType: plotData.houseType,
-				rentPrice: plotData.rentPrice,
-				details: plotData.details
+				plotName: firestorePlotData.plotName,
+				numberOfHouses: firestorePlotData.numberOfHouses,
+				houseType: firestorePlotData.houseType,
+				rentPrice: firestorePlotData.rentPrice,
+				details: firestorePlotData.details
 			})
 		}
-	}, [plotData])
+	}, [firestorePlotData])
 
-	// ===============================================================================
-	const submitFormData = () => {
+	const submitFormData = async () => {
 		try{
-			db.runAsync('UPDATE plots SET plotName = ?, numberOfHouses = ?, houseType = ?, rentPrice = ?, details = ? WHERE id = ?', [formData.plotName, formData.numberOfHouses, formData.houseType, formData.rentPrice, formData.details, plotId])
+			// @ts-ignore
+			await updateDoc(doc(firestore, `/users/${userId}/plots`, plotId), {
+				plotName: formData.plotName,
+				numberOfHouses: formData?.numberOfHouses,
+				houseType: formData?.houseType,
+				rentPrice: formData?.rentPrice,
+				details: formData?.details
+			})
 			closePlotModal()
 			setPlotUpdated(!plotUpdated)
 			setSnackBarMsg('Plot Updated Successfully')
@@ -92,7 +116,6 @@ const EditPlot = ({plotId, plotUpdated, closePlotModal, setPlotUpdated, setSnack
 	const handleBack = () => {
 		if (currentStep > 1) setCurrentStep(currentStep - 1);
 	}
-
 
 	const renderStep = () => {
 		switch (currentStep) {

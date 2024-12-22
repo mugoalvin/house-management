@@ -1,5 +1,5 @@
 import { Alert, SafeAreaView, View, useColorScheme, } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import CustomizedText from './CustomizedText'
 import { TextInput, useTheme } from 'react-native-paper'
 import { useSQLiteContext } from 'expo-sqlite'
@@ -10,7 +10,9 @@ import ConfirmView from './ConfirmView'
 
 
 import { firestore } from '@/firebaseConfig'
-import { addDoc, doc, setDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, setDoc } from 'firebase/firestore'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { houseProps } from '@/app/houses'
 
 
 interface FormData {
@@ -41,11 +43,21 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 	const initialFormData: FormData = {plotName: '', numberOfHouses: 0, houseType: '', rentPrice: 0, details: '', paidHouses: 0, amountPaid: 0, numberOccupiedHouses: 0}
 	const [formData, setFormData] = useState<FormData>(initialFormData)
 	const maxRenderSteps = 4
+	
+	const [ userId, setUserId ] = useState<string>()
 
-	const handleInputChange = (field: keyof FormData, value: string) => {
+	const getUserId = async () => {
+		await AsyncStorage.getItem('userId')
+			.then((id) => {
+				setUserId(id?.toString())
+			})
+	}
+
+	const handleInputChange = (field: keyof FormData, value: string | number) => {
 		setFormData({ ...formData, [field]: value });
 	}
-		const handleNext = () => {
+
+	const handleNext = () => {
 		if (currentStep < maxRenderSteps) setCurrentStep(currentStep + 1);
 	}
 
@@ -54,38 +66,51 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 	}
 
 	const submitFormData = async () => {
-		try {
+		// ++++++++++++++++++++++++++++++++++++++++Firebase Add Tenant++++++++++++++++++++++++++++++++++++++++
+		// await setDoc(doc(firestore, `/users/${userId}/plots`, formData.plotName ), formData)
+		// @ts-ignore
+		// await setDoc(doc(firestore, `/users/${userId}/${collection(firestore, 'plots').doc().id}`), formData)
+		const docRef = doc(collection(firestore, `/users/${userId}/plots`))
+		await setDoc(docRef, formData)
+			.then(async () => {
+				const plotId = docRef.id
+				for (let i = 0; i < formData.numberOfHouses; i++) {
+					const houseDocRef = doc(collection(firestore, `/users/${userId}/plots/${plotId}/houses`)); // Generate a unique document ID
+					await setDoc(houseDocRef, {
+						houseNumber: `#${i + 1}`,
+						rent: formData.rentPrice
+					})
+				}
 
-			// ++++++++++++++++++++++++++++++++++++++++Firebase Add Tenant++++++++++++++++++++++++++++++++++++++++
-			await setDoc(doc(firestore, '/plots', formData.plotName ), formData)
-				.then(() => {
-					closeAddPlotModal()
-					setPlotUpdated(!plotUpdated)
-					onToggleSnackBar()
-					setSnackBarMsg(`${formData.plotName} Added Successfully`)
-				})
-				.catch(error => {
-					console.error(error)
-				})
-			// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-			
-			// -------------------------------------------------------------------------------SQLite Add Tenant-------------------------------------------------------------------------------
-			const newTenant = await db.runAsync(`
-				INSERT INTO plots( 'plotName', 'numberOfHouses', 'houseType', 'rentPrice', 'details', 'paidHouses', 'amountPaid', 'numberOccupiedHouses' ) VALUES( ?, ?, ?, ?, ?, 0, 0, 0 ); ` ,
-				[formData.plotName, formData.numberOfHouses ?? 0, formData.houseType, formData.rentPrice ?? 0, formData.details])
-
-			if (newTenant.changes == 1) {
 				closeAddPlotModal()
 				setPlotUpdated(!plotUpdated)
-				// Alert.alert('Done', `${formData.plotName} Added Successfully`)
 				onToggleSnackBar()
-				setSnackBarMsg(`${formData.plotName} Added Successfully`)
-			}
-			// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-		}
-		catch (e) {
-			Alert.alert('Error Submitting Data', `${e}`)
-		}
+				setSnackBarMsg(`${formData.plotName} and ${formData.numberOfHouses} Created Successfully`)
+			})
+			.catch(error => {
+				console.error(error)
+			})
+
+		// const houseData : houseProps = {
+		// 	// houseNumber: 
+		// 	rent: 
+		// }
+		// await setDoc(doc(firestore, `/users/${userId}/plots/${docRef.id}/houses`), )
+		// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		
+		// -------------------------------------------------------------------------------SQLite Add Tenant-------------------------------------------------------------------------------
+		// const newTenant = await db.runAsync(`
+		// 	INSERT INTO plots( 'plotName', 'numberOfHouses', 'houseType', 'rentPrice', 'details', 'paidHouses', 'amountPaid', 'numberOccupiedHouses' ) VALUES( ?, ?, ?, ?, ?, 0, 0, 0 ); ` ,
+		// 	[formData.plotName, formData.numberOfHouses ?? 0, formData.houseType, formData.rentPrice ?? 0, formData.details])
+
+		// if (newTenant.changes == 1) {
+		// 	closeAddPlotModal()
+		// 	setPlotUpdated(!plotUpdated)
+		// 	// Alert.alert('Done', `${formData.plotName} Added Successfully`)
+		// 	onToggleSnackBar()
+		// 	setSnackBarMsg(`${formData.plotName} Added Successfully`)
+		// }
+		// -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	}
 
 	const houseOptions = [
@@ -95,6 +120,10 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 		{key: 4, value: 'Two Bedroom' },
 		{key: 5, value: 'Three Bedroom' },
 	]
+
+	useEffect(() => {
+		getUserId()
+	}, [])
 
 	const renderStep = () => {
 		switch (currentStep) {
@@ -115,7 +144,7 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 							// value={formData.numberOfHouses !== undefined ? String(formData.numberOfHouses) : ''}
 							value={String(formData.numberOfHouses) || ''}
 							keyboardType='numeric'
-							onChangeText={(value) => handleInputChange('numberOfHouses', value)}
+							onChangeText={(value) => handleInputChange('numberOfHouses', parseInt(value))}
 							style={getModalStyle(colorScheme, theme).textInput}
 						/>
 					</View>
@@ -152,7 +181,7 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 							keyboardType='numeric'
 							value={formData.rentPrice !== undefined ? String(formData.rentPrice) : ''}
 							style={getModalStyle(colorScheme, theme).textInput}
-							onChangeText={(value) => handleInputChange('rentPrice', value)}
+							onChangeText={(value) => handleInputChange('rentPrice', parseInt(value))}
 						/>
 					</View>
 				)

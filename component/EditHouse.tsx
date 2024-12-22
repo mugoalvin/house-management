@@ -11,7 +11,7 @@ import ModalButtons from './ModalButtons'
 
 
 interface AddPlotProps {
-	selectedHouseId: number
+	selectedHouseId: string
 	closeEditHouseModal: () => void
 	onToggleSnackBar: () => void
 	setSnackBarMsg: (msg: string) => void
