@@ -1,5 +1,5 @@
 export type plotsProps = {
-	id?: number
+	id?: number | string
 	plotName: string
 	numberOfHouses: number
 	amountPaid: number

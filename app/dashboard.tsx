@@ -22,6 +22,7 @@ import { titleFontSize } from "@/assets/values";
 import { doc, getDoc } from "firebase/firestore";
 import { firestore } from "@/firebaseConfig";
 import { firebaseTenantProps } from "@/assets/firebaseObjs/tenants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Dashboard() {
 	const db = useSQLiteContext()
@@ -30,7 +31,7 @@ export default function Dashboard() {
 	const colorScheme = useColorScheme() || 'dark'
 	const dashboardStyle = getDashboardStyle(colorScheme, theme)
 
-	const { userId } = useLocalSearchParams()
+	const [ userId, setUserId ] = useState<string>()
 	
 	const [allTenants, setAllTenants] = useState<tenantProps[]>([])
 	const [allTenantsColumns, setAllTenantsColumns] = useState<any[]>([])
@@ -53,6 +54,13 @@ export default function Dashboard() {
 			}
 			return !prevIsDrawerOpen
 		})
+	}
+
+	const getUserId = async () => {
+		await AsyncStorage.getItem('userId')
+			.then((id) => {
+				setUserId(id?.toString())
+			})
 	}
 
 	const mapColumnNames = (rawColumns: Array<{ name: string }>) => {
@@ -79,7 +87,7 @@ export default function Dashboard() {
 			LEFT JOIN houses ON tenants.houseId = houses.id 
 			LEFT JOIN plots ON houses.plotId = plots.id
 		`)
-
+		
 		tenants.forEach(tenant => {
 			// @ts-ignore
 			tenant.moveInDate = new Date(tenant.moveInDate).toDateString()
@@ -144,24 +152,25 @@ export default function Dashboard() {
 			title: 'Dashboard',
 			headerShown: true,
 		})
+
+		getUserId()
 	}, [])
 
 	const getUserData = async(userId: string) => {
-		console.log(userId)
 		const docRef = doc(firestore, 'users', userId)
 		const docSnap = await getDoc(docRef)
 
 		if (docSnap.exists()) {
 			setUserData(docSnap.data() as firebaseTenantProps)
-			// console.log(docSnap.data())
 
-			navigation.setOptions({
-				title: `Welcome, ${userData?.firstName}`,
-				headerTitleAlign: 'left' as const,
-			})
+			// navigation.setOptions({
+			// 	// title: `Welcome, ${userData?.firstName}`,
+			// 	title: `Welcome, ${userId}`,
+			// 	headerTitleAlign: 'left' as const,
+			// })
 		}
 		else {
-			console.log('No docs found!')
+			console.warn('No docs found!')
 		}
 	}
 
