@@ -16,7 +16,7 @@ import { houseProps } from '@/app/houses'
 
 type PlotInfoProps = {
 	plotData: plotsProps
-	houses: houseDataProps[]
+	houses: Partial<houseDataProps[]>
 }
 
 const PlotInfo = ({ plotData, houses }: PlotInfoProps) => {
