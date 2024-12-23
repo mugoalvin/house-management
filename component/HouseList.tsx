@@ -2,20 +2,33 @@ import { Alert, Pressable, Vibration, View } from 'react-native'
 import React, { useState } from 'react'
 import { router } from 'expo-router'
 import { Avatar, Button, Divider, Icon, List, Menu, useTheme } from 'react-native-paper'
+import { tenantProps } from '@/assets/tenants'
+import { CombinedHouseTenantData } from '@/app/plotPage'
+
+// type houseObject = {
+// 	houseId: string
+// 	tenantId: number
+// 	houseNumber: string
+// 	tenant: string
+// 	occupancy: string
+// 	time: string
+// }
 
 type houseObject = {
 	houseId: string
-	tenantId: number
+	// tenantId: number
 	houseNumber: string
-	tenantName: string
-	occupancy: string
-	time: string
+	tenant: Partial<tenantProps>[]
+	rent: number
+	// occupancy: string
+	// time: string
 }
 
 type HouseInListProps = {
 	plotId: number
 	plotName: string
-	house: houseObject
+	// house: houseObject
+	house: Partial<CombinedHouseTenantData>
 	setModalVisibility: (state: boolean) => void
 	setSelectedHouseId: (houseId: string) => void
 }
@@ -42,15 +55,18 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 	return (
 		<>
 			<List.Item
-				onPress={() => handleHousePress(plotName, house, plotId)}
+				// onPress={() => handleHousePress(plotName, house, plotId)}
 				onLongPress={() => {openMenu(); Vibration.vibrate(150)}}
-				title={house.tenantName == 'Unknown' ? 'VACANT' : house.tenantName}
-				titleStyle={house.tenantName != 'Unknown' ? { fontFamily: 'DefaultCustomFont-ExtraBold' } : { color: '#999', fontFamily: 'DefaultCustomFont' }}
-				description={house.tenantName !== 'Unknown' && house.time}
+				// title={house.tenantName == 'Unknown' ? 'VACANT' : house.tenantName}
+				// title={house.tenants[0].firstName == 'Unknown' ? 'VACANT' : house.tenantName}
+				title={"Tenant Name"}
+				// titleStyle={house.tenantName != 'Unknown' ? { fontFamily: 'DefaultCustomFont-ExtraBold' } : { color: '#999', fontFamily: 'DefaultCustomFont' }}
+				// description={house.tenantName !== 'Unknown' && house.time}
+				description={"Description"}
 				descriptionStyle={{ fontFamily: 'DefaultCustomFont' }}
 				left={props => (
 					<>
-						<Avatar.Text label={house.houseNumber} size={45} labelStyle={{ fontFamily: 'DefaultCustomFont-ExtraBold', fontSize: 24, color: theme.colors.tertiary }} style={{backgroundColor: theme.colors.surface}} />
+						<Avatar.Text label={house.house?.houseNumber || ''} size={45} labelStyle={{ fontFamily: 'DefaultCustomFont-ExtraBold', fontSize: 24, color: theme.colors.tertiary }} style={{backgroundColor: theme.colors.surface}} />
 					</>
 				)}
 				right={() => (
@@ -67,7 +83,7 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 						<Menu.Item
 							onPress={() => {
 								closeMenu()
-								setSelectedHouseId(house.houseId)
+								setSelectedHouseId(house.house?.houseId || '')
 								setModalVisibility(true)
 								}}
 							leadingIcon='pencil'

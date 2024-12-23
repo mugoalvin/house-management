@@ -12,7 +12,7 @@ import ModalButtons from './ModalButtons'
 
 interface AddPlotProps {
 	selectedHouseId: string
-	closeEditHouseModal: () => void
+	closeEditHouseModal?: () => void
 	onToggleSnackBar: () => void
 	setSnackBarMsg: (msg: string) => void
 }
@@ -79,7 +79,7 @@ const EditHouse = ({ selectedHouseId, closeEditHouseModal, onToggleSnackBar, set
 
 	const handleFormSubmit = async () => {
 		try{
-			closeEditHouseModal()
+			// closeEditHouseModal()
 			await db.runAsync('UPDATE houses SET houseNumber = ?, houseType = ?, rent = ? WHERE id = ?', [formData.houseNumber, formData.type ?? '', formData.rent, selectedHouseId])
 			// setHouseUpdated(!houseUpdated)
 			setSnackBarMsg('House Data Updated')

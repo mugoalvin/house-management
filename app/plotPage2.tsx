@@ -17,54 +17,30 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore"
 import { firestore } from "@/firebaseConfig"
 import { tenantProps } from "@/assets/tenants"
 
-
-// export type houseDataProps = {
-// 	tenants: Partial<tenantProps[]>
-// 	houseId: string
-// 	tenantId: number
-// 	houseNumber: string
-// 	tenantName: string
-// 	isOccupied: string
-// 	rent: number
-// 	houseType: string
-// 	moveInDate: Date
-// }
-
-export interface CombinedHouseTenantData {
-	house: houseDataProps;
-	tenants: tenantProps[];
-}
-
 export type houseDataProps = {
-	houseId: string
-
-
-export type houseDataProps = {
+	tenants: Partial<tenantProps[]>
 	houseId: string
 	tenantId: number
 	houseNumber: string
-	tenants: Partial<tenantProps[]>
-	isOccupied: boolean
+	tenantName: string
+	isOccupied: string
 	rent: number
 	houseType: string
+	moveInDate: Date
 }
 
-
 const PlotPage = () => {
-
 	const theme = useTheme()
 	const navigation = useNavigation()
 	const colorScheme = useColorScheme() || 'dark'
 	const plotsPageStyles = getPlotsPageStyles(colorScheme, theme)
-	const [userId, setUserId] = useState<string>()
 	const { plotName, plotId } = useLocalSearchParams()
 	const [plotData, setPlotData] = useState<plotsProps>({} as plotsProps)
-	const [housesInPlots, setHousesInPlots] = useState<Partial<houseDataProps[]>>([])
-	const [housesToDisplay, setHousesToDisplay] = useState<Partial<CombinedHouseTenantData[]>>([])
+	const [housesInPlots, setHousesInPlots] = useState<houseDataProps[]>([])
+	const [housesToDisplay, setHousesToDisplay] = useState<houseDataProps[]>([])
 	const [modalVisibility, setModalVisibility] = useState<boolean>(false)
 	const [selectedHouseId, setSelectedHouseId] = useState<string>()
 	const [snackBarMsg, setSnackBarMsg] = useState<string>('')
-	const [houseTenantObjList, setHouseTenantObjList] = useState<CombinedHouseTenantData[]>([])
 
 	const [userId, setUserId] = useState<string>()
 
@@ -81,20 +57,21 @@ const PlotPage = () => {
 			.then((id) => {
 				setUserId(id?.toString())
 			})
+	}
 
+	const getOccupiesHouses = (): houseDataProps[] => {
+		return housesInPlots.filter(house => house.tenantId !== null)
+	}
+
+	const getVacantHouses = (): houseDataProps[] => {
+		return housesInPlots.filter(house => house.tenantId == null)
 	}
 
 	const getPlotData = async (plotId: string) => {
 		setPlotData((await getDoc(doc(firestore, `/users/${userId}/plots`, plotId))).data() as plotsProps)
 	}
 
-
-
-
-
-
-	const getTenantsInHouses = async () => {
-		// Get all houses in plot
+	const getHousesInPlot = async () => {
 		await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses`))
 			.then(snapShot => {
 				const housesList: Partial<houseDataProps>[] = []
@@ -103,52 +80,80 @@ const PlotPage = () => {
 				})
 				// @ts-ignore
 				housesList.sort((houseA, houseB) => houseA.houseNumber?.split('')[1] - houseB.houseNumber?.split('')[1]) // Sorts houses in ascending order
-				// setHousesInPlots(housesList || [] as houseDataProps[])
 				// @ts-ignore
 				setHousesInPlots(housesList)
-				console.log('housesList')
-				console.log(housesList)
-
-				const combinedList: any = []
-				// Loop through each house
-				housesList.forEach(house => {
-					// Get all tenants in house
-					getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.houseId}/tenants`))
-						.then(snapShot => {
-							const tenantsList: Partial<tenantProps>[] = []
-							snapShot.forEach(doc => {
-								tenantsList.push({ id: doc.id, ...doc.data() })
-								// console.log({ id: doc.id, ...doc.data() })
-							})
-							// If it has a tenant
-							if (tenantsList.length > 0) {
-								// Get the tenant's data
-								const combined = { house, ...tenantsList }
-								console.log(combined)
-								combinedList.push(combined)
-							}
-						})
-				})
-				setHouseTenantObjList(combinedList)
 			})
 			.catch(error => {
 				console.error(error)
 			})
-		// If has a tenant, add tenant obj to house obj
-		// Update state
 	}
 
+	// const getTenantsInHouse = () => {
+	// 	try {
+	// 		housesInPlots.forEach(async house => {
+	// 		const tenants = {} as Partial<tenantProps>
+	// 			await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.houseId}/tenants`))
+	// 				.then(snapShot => {
+	// 					snapShot.forEach(doc => {
+	// 						console.log({id: doc.id, ...doc.data()})
+	// 						tenants.push({
+	// 							id: doc.id, ...doc.data()
+	// 						})
+	// 					})
+	// 				})
+	// 			console.log(tenants)
+	// 		})
+	// 	}
+	// 	catch (error) {
+	// 		console.error(error)
+	// 	}
+	// }
 
+	const getTenantsInHouse = async () => {
+		try {
+			// Loop through housesInPlots
+			for (const house of housesInPlots) {
+				const tenants: any = []
 
+				// Fetch tenants for the current house
+				const querySnapshot = await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.houseId}/tenants`));
 
+				// Process tenant data for each document
+				querySnapshot.forEach(doc => {
+					tenants.push({ id: doc.id, ...doc.data() });
+				});
 
+				// Update the house object with the fetched tenants (assuming a 'tenants' property exists)
+				house.tenants = tenants;
+			}
 
+			// Update housesToDisplay with modified houses (considering filtering)
+			const updatedHousesToDisplay = housesInPlots.map(house => ({
+				...house, // Include all house properties
+				// tenantName: house.tenants?.length > 0 ? house.tenants[0]?.tenantName : 'Unknown',
+			}));
+			console.log(updatedHousesToDisplay)
+			// @ts-ignore
+			setHousesToDisplay(updatedHousesToDisplay)
+		} catch (error) {
+			console.error(error);
+		}
+	};
 
+	useEffect(() => {
+		if (plotId && userId) {
+			getPlotData(plotId as string)
+			getHousesInPlot()
+		}
+	}, [plotId, userId])
 
+	useEffect(() => {
+		getTenantsInHouse()
+	}, [housesInPlots])
 
-
-
-
+	useEffect(() => {
+		setHousesToDisplay(housesInPlots)
+	}, [housesInPlots])
 
 	useEffect(() => {
 		navigation.setOptions({
@@ -157,26 +162,20 @@ const PlotPage = () => {
 		getUserId()
 	}, [])
 
-	useEffect(() => {
-		setHousesToDisplay(houseTenantObjList)
-	}, [houseTenantObjList])
+	const housesData = housesToDisplay.map(house => ({
+		houseId: house.houseId,
+		tenantId: house.tenantId,
+		houseNumber: house.houseNumber,
+		tenantName: house.tenantName || 'Unknown',
+		occupancy: house.isOccupied ? 'OCCUPIED' : 'VACANT',
+		rent: house.rent,
+		houseType: house.houseType,
+		time: calculateTimeDuration(house.moveInDate)
+	}))
 
-
-	useEffect(() => {
-		if (plotId && userId) {
-			getPlotData(plotId as string)
-		}
-	}, [plotId, userId])
-
-	useEffect(() => {
-		getTenantsInHouses()
-	}, [housesInPlots])
-
-	// useEffect(() => {
-	// 	setHousesToDisplay(housesInPlots || '')
-	// 	// @ts-ignore
-	// }, [housesInPlots])
-
+	const closeEditHouseModal = () => {
+		setModalVisibility(false)
+	}
 
 	return (
 		<>
@@ -204,11 +203,10 @@ const PlotPage = () => {
 									</TouchableOpacity>
 								}
 								contentStyle={{ backgroundColor: theme.colors.surface, top: 40 }}
-								children={undefined}
 							>
-								{/* <Menu.Item onPress={() => { closeMenu(); setHousesToDisplay(housesInPlots) }} title='All' titleStyle={plotsPageStyles.titleStyle} style={plotsPageStyles.menuItem} /> */}
-								{/* <Menu.Item onPress={() => { closeMenu(); setHousesToDisplay(getOccupiesHouses()) }} title='Occupied Only' titleStyle={plotsPageStyles.titleStyle} style={plotsPageStyles.menuItem} /> */}
-								{/* <Menu.Item onPress={() => { closeMenu(); setHousesToDisplay(getVacantHouses()) }} title='Vacant Only' titleStyle={plotsPageStyles.titleStyle} style={plotsPageStyles.menuItem} /> */}
+								<Menu.Item onPress={() => { closeMenu(); setHousesToDisplay(housesInPlots) }} title='All' titleStyle={plotsPageStyles.titleStyle} style={plotsPageStyles.menuItem} />
+								<Menu.Item onPress={() => { closeMenu(); setHousesToDisplay(getOccupiesHouses()) }} title='Occupied Only' titleStyle={plotsPageStyles.titleStyle} style={plotsPageStyles.menuItem} />
+								<Menu.Item onPress={() => { closeMenu(); setHousesToDisplay(getVacantHouses()) }} title='Vacant Only' titleStyle={plotsPageStyles.titleStyle} style={plotsPageStyles.menuItem} />
 							</Menu>
 
 						</View>
@@ -217,13 +215,11 @@ const PlotPage = () => {
 								// houseData.map(house => (
 								// 	<HouseList key={house.houseId} house={house} plotName={plotName.toString()} plotId={Number(plotId)} setModalVisibility={setModalVisibility} setSelectedHouseId={setSelectedHouseId} />
 								// ))
-								housesToDisplay?.map((house, i) => {
-									console.log(1, house)
 
-									return (
-										<HouseList key={i} house={house || {}} plotName={plotName.toString()} plotId={Number(plotId)} setModalVisibility={setModalVisibility} setSelectedHouseId={setSelectedHouseId} />
-									)
-								})
+								housesToDisplay.map((house, i) => (
+									<CustomizedText key={i}>{house.houseNumber} {house.tenants[0]?.tenantName}</CustomizedText>
+									// <HouseList key={house.houseId} house={house} plotName={plotName.toString()} plotId={Number(plotId)} setModalVisibility={setModalVisibility} setSelectedHouseId={setSelectedHouseId} />
+								))
 
 							}
 						</ScrollView>
@@ -232,14 +228,10 @@ const PlotPage = () => {
 					<Portal>
 						<Modal
 							visible={modalVisibility}
-							// onDismiss={closeEditHouseModal}
+							onDismiss={closeEditHouseModal}
 							style={plotsPageStyles.modal}
 						>
-
-							<EditHouse selectedHouseId={selectedHouseId || ''}
-								// closeEditHouseModal={closeEditHouseModal} 
-								setSnackBarMsg={setSnackBarMsg} onToggleSnackBar={openSnackBar} />
-
+							<EditHouse selectedHouseId={selectedHouseId || ''} closeEditHouseModal={closeEditHouseModal} setSnackBarMsg={setSnackBarMsg} onToggleSnackBar={openSnackBar} />
 						</Modal>
 					</Portal>
 
