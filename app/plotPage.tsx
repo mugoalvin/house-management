@@ -17,6 +17,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore"
 import { firestore } from "@/firebaseConfig"
 import { tenantProps } from "@/assets/tenants"
 
+
 // export type houseDataProps = {
 // 	tenants: Partial<tenantProps[]>
 // 	houseId: string
@@ -36,6 +37,11 @@ export interface CombinedHouseTenantData {
 
 export type houseDataProps = {
 	houseId: string
+
+
+export type houseDataProps = {
+	houseId: string
+	tenantId: number
 	houseNumber: string
 	tenants: Partial<tenantProps[]>
 	isOccupied: boolean
@@ -60,6 +66,8 @@ const PlotPage = () => {
 	const [snackBarMsg, setSnackBarMsg] = useState<string>('')
 	const [houseTenantObjList, setHouseTenantObjList] = useState<CombinedHouseTenantData[]>([])
 
+	const [userId, setUserId] = useState<string>()
+
 	const [snackBarVisibility, setSnackBarVisibility] = useState(false)
 	const openSnackBar = () => setSnackBarVisibility(true)
 	const dismissSnackBar = () => setSnackBarVisibility(false)
@@ -73,11 +81,13 @@ const PlotPage = () => {
 			.then((id) => {
 				setUserId(id?.toString())
 			})
+
 	}
 
 	const getPlotData = async (plotId: string) => {
 		setPlotData((await getDoc(doc(firestore, `/users/${userId}/plots`, plotId))).data() as plotsProps)
 	}
+
 
 
 
@@ -127,6 +137,7 @@ const PlotPage = () => {
 		// If has a tenant, add tenant obj to house obj
 		// Update state
 	}
+
 
 
 
@@ -224,9 +235,11 @@ const PlotPage = () => {
 							// onDismiss={closeEditHouseModal}
 							style={plotsPageStyles.modal}
 						>
+
 							<EditHouse selectedHouseId={selectedHouseId || ''}
 								// closeEditHouseModal={closeEditHouseModal} 
 								setSnackBarMsg={setSnackBarMsg} onToggleSnackBar={openSnackBar} />
+
 						</Modal>
 					</Portal>
 
