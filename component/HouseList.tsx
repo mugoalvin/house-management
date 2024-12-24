@@ -1,9 +1,10 @@
-import { Alert, Pressable, Vibration, View } from 'react-native'
 import React, { useState } from 'react'
+import { Pressable, Vibration } from 'react-native'
 import { router } from 'expo-router'
-import { Avatar, Button, Divider, Icon, List, Menu, useTheme } from 'react-native-paper'
+import { Avatar, Icon, List, Menu, useTheme } from 'react-native-paper'
 import { tenantProps } from '@/assets/tenants'
 import { CombinedHouseTenantData } from '@/app/plotPage'
+import { calculateTimeDuration } from '@/assets/values'
 
 // type houseObject = {
 // 	houseId: string
@@ -25,7 +26,7 @@ type houseObject = {
 }
 
 type HouseInListProps = {
-	plotId: number
+	plotId: string
 	plotName: string
 	// house: houseObject
 	house: Partial<CombinedHouseTenantData>
@@ -41,13 +42,14 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 	const openMenu = () => setVisible(true)
 	const closeMenu = () => setVisible(false)
 
-	const handleHousePress = (plotName: string, house: houseObject, plotId: number) => {
+	const handleHousePress = (plotName: string, house: Partial<CombinedHouseTenantData>, plotId: string) => {
 		router.push({
 			pathname: '/housePage',
 			params: {
-				plotId: plotId,
+				houseId: house.house?.houseId,
+				plotid: plotId,
 				plotName: plotName,
-				house: JSON.stringify(house ?? {} as houseObject),
+				house: JSON.stringify(house ?? {} as Partial<CombinedHouseTenantData>)
 			}
 		})
 	}
@@ -55,28 +57,25 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 	return (
 		<>
 			<List.Item
-				// onPress={() => handleHousePress(plotName, house, plotId)}
-				onLongPress={() => {openMenu(); Vibration.vibrate(150)}}
-				// title={house.tenantName == 'Unknown' ? 'VACANT' : house.tenantName}
-				// title={house.tenants[0].firstName == 'Unknown' ? 'VACANT' : house.tenantName}
-				title={"Tenant Name"}
-				// titleStyle={house.tenantName != 'Unknown' ? { fontFamily: 'DefaultCustomFont-ExtraBold' } : { color: '#999', fontFamily: 'DefaultCustomFont' }}
-				// description={house.tenantName !== 'Unknown' && house.time}
-				description={"Description"}
+				onPress={() => handleHousePress(plotName, house, plotId)}
+				onLongPress={() => { openMenu(); Vibration.vibrate(150) }}
+				title={(house.tenants ?? []).length > 0 ? `${house.tenants![0].firstName}  ${house.tenants![0].lastName}` : 'VACANT'}
+				description={house.tenants?.length !== 0 && calculateTimeDuration(new Date(house.tenants![0].moveInDate))}
+				titleStyle={house.tenants?.length !== 0 ? { fontFamily: 'DefaultCustomFont-ExtraBold' } : { color: '#999', fontFamily: 'DefaultCustomFont' }}
 				descriptionStyle={{ fontFamily: 'DefaultCustomFont' }}
 				left={props => (
 					<>
-						<Avatar.Text label={house.house?.houseNumber || ''} size={45} labelStyle={{ fontFamily: 'DefaultCustomFont-ExtraBold', fontSize: 24, color: theme.colors.tertiary }} style={{backgroundColor: theme.colors.surface}} />
+						<Avatar.Text label={house.house?.houseNumber || ''} size={45} labelStyle={{ fontFamily: 'DefaultCustomFont-ExtraBold', fontSize: 24, color: theme.colors.tertiary }} style={{ backgroundColor: theme.colors.surface }} />
 					</>
 				)}
 				right={() => (
 					<Menu
 						visible={visible}
 						onDismiss={closeMenu}
-						contentStyle={{top: 30, right: 30, backgroundColor: theme.colors.surface}}
+						contentStyle={{ top: 30, right: 30, backgroundColor: theme.colors.surface }}
 						anchor={
-							<Pressable 
-								onPress={openMenu} style={{paddingVertical: 10, paddingLeft: 15}}>
+							<Pressable
+								onPress={openMenu} style={{ paddingVertical: 10, paddingLeft: 15 }}>
 								<Icon source='dots-vertical' size={20} />
 							</Pressable>
 						}>
@@ -85,11 +84,11 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 								closeMenu()
 								setSelectedHouseId(house.house?.houseId || '')
 								setModalVisibility(true)
-								}}
+							}}
 							leadingIcon='pencil'
 							title="Edit House Type"
-							titleStyle={{fontFamily: 'DefaultCustomFont', fontSize: theme.fonts.bodyMedium.fontSize}}
-							/>
+							titleStyle={{ fontFamily: 'DefaultCustomFont', fontSize: theme.fonts.bodyMedium.fontSize }}
+						/>
 					</Menu>
 				)}
 			/>

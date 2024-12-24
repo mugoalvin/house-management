@@ -66,7 +66,7 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 	}
 
 	const submitFormData = async () => {
-		// ++++++++++++++++++++++++++++++++++++++++Firebase Add Tenant++++++++++++++++++++++++++++++++++++++++
+		// ++++++++++++++++++++++++++++++++++++++++Firebase Add Plot++++++++++++++++++++++++++++++++++++++++
 		// await setDoc(doc(firestore, `/users/${userId}/plots`, formData.plotName ), formData)
 		// @ts-ignore
 		// await setDoc(doc(firestore, `/users/${userId}/${collection(firestore, 'plots').doc().id}`), formData)
@@ -78,6 +78,7 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 					const houseDocRef = doc(collection(firestore, `/users/${userId}/plots/${plotId}/houses`)); // Generate a unique document ID
 					await setDoc(houseDocRef, {
 						houseNumber: `#${i + 1}`,
+						houseType: formData.houseType,
 						rent: formData.rentPrice
 					})
 				}

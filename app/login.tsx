@@ -15,8 +15,8 @@ const Login = () => {
 	const styles = getAuthStyle(colorScheme, theme)
 	const navigation = useNavigation()
 	
-	const [email, setEmail] = useState<string>()
-	const [password, setPassword] = useState<string>()
+	const [email, setEmail] = useState<string>('niawai@gmail.com')
+	const [password, setPassword] = useState<string>('Asdfghjkl')
 
 	const [loginButtonPressed, setLoginButtonPressed] = useState<boolean>(false)
 
@@ -89,6 +89,8 @@ const Login = () => {
 					onChangeText={(text) => setEmail(text)}
 					style={styles.input}
 					keyboardType="email-address"
+
+					value={email}
 				/>
 
 				{/* Password Input */}
@@ -98,6 +100,8 @@ const Login = () => {
 					onChangeText={(text) => setPassword(text)}
 					style={styles.input}
 					secureTextEntry
+
+					value={password}
 				/>
 
 				{/* Login Button */}

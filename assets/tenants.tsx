@@ -14,7 +14,7 @@ export type  tenantProps = {
     firstName: string
     lastName: string
     contactInfo: string
-    moveInDate: Date
+    moveInDate: string | Date
     occupation: string
     rentOwed: number
     depositOwed: number
