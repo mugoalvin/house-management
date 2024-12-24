@@ -6,19 +6,20 @@ import { appFontSize, bigNumberFontSize, calculateTimeDuration, getMonthsBetween
 import { PieChart, PieChartPro } from 'react-native-gifted-charts'
 import { useSQLiteContext } from 'expo-sqlite'
 import { Fragment, useCallback, useEffect, useState } from 'react'
+import _ from 'lodash'
 import { ActivityIndicator, FAB, Icon, MD3Theme, Modal, Portal, Snackbar, useTheme } from 'react-native-paper'
 import AddTenant from '@/component/AddTenant'
 import DeleteTenant from '@/component/DeleteTenant'
 import Payment from '@/component/Payment'
 import { transactionDBProp } from "@/assets/transactions"
 import PaymentProgress from "@/component/PaymentProgress"
-import { tenantProps } from "@/assets/tenants"
 import EditTenant from '@/component/EditTenant'
 import { CombinedHouseTenantData } from './plotPage'
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, setDoc, onSnapshot, getDoc } from 'firebase/firestore'
 import { firestore } from '@/firebaseConfig'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import ConfirmView from '@/component/ConfirmView'
+import { tenantProps } from '@/assets/tenants'
 
 
 interface houseDataProps {
@@ -39,9 +40,10 @@ const housePage = () => {
 	const colorScheme = useColorScheme() || 'dark'
 	const style = getHousePageStyles(theme)
 	const { houseId, plotName, house, plotid } = useLocalSearchParams()
-	const [plotId, setPlotId] = useState<string>(plotid as string)
-	const houseData: CombinedHouseTenantData = house ? JSON.parse(house as string) : {}
-	const [loading, setLoading] = useState<boolean>(true)
+	const plotId = plotid as string
+	const [houseData, setHouseData] = useState<CombinedHouseTenantData>(house ? JSON.parse(house as string) : {})
+	// const [houseDataDB, setHouseDataDB] = useState<CombinedHouseTenantData>({} as CombinedHouseTenantData)
+	const [houseDataDB, setHouseDataDB] = useState<CombinedHouseTenantData>(houseData)
 	const [modalVisibility, setModalVisibility] = useState<boolean>(false)
 	const [transactionData, setTransactionData] = useState<transactionDBProp[]>([])
 	const [modalAction, setModalAction] = useState<'add' | 'edit' | 'delete' | 'payment' | null>(null)
@@ -51,7 +53,8 @@ const housePage = () => {
 	const [userId, setUserId] = useState<string>()
 	const [monthsLivedInHouse, setMonthsLivedInHouse] = useState<number>(0)
 	const [durationLabel, setDurationLabel] = useState<string>()
-	const [pieData, setPieData] = useState<{value: number, color: string}[]>([])
+	const [pieData, setPieData] = useState<{ value: number, color: string }[]>([])
+	const [tenantAdded, setTenantAdded] = useState<boolean>(false)
 
 
 	const [fabOpen, setFabOpen] = useState({ open: false })
@@ -62,25 +65,51 @@ const housePage = () => {
 	const onOpenSnackBar = () => setSnackBarVisibility(true)
 	const onDismissSnackBar = () => setSnackBarVisibility(false)
 
+	async function updateHouseData() {
+		try {
+			if (userId && plotId && houseId && houseData.tenants.length > 0) {
+				const houseRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}`);
+				const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${houseData.tenants[0].id}`);
+
+				const houseDoc = await getDoc(houseRef);
+				const tenantDoc = await getDoc(tenantRef);
+
+				if (houseDoc.exists() && tenantDoc.exists()) {
+					const mergedData: CombinedHouseTenantData = {
+						// @ts-ignore
+						house: { houseId: houseDoc.id, ...(houseDoc.data() as Partial<houseDataProps>) },
+						// @ts-ignore
+						tenants: [{ id: tenantDoc.id, ...(tenantDoc.data() as Partial<tenantProps>) }]
+					}
+
+					setHouseDataDB(mergedData)
+				} else {
+					console.error('Document does not exist');
+				}
+			}
+		} catch (error) {
+			console.error('Error updating house data:', error);
+		}
+	}
 
 	function getMonthlyExpected(): number {
-		if (houseData.tenants[0] == undefined) {
+		if (houseDataDB.tenants[0] == undefined) {
 			return 0
 		}
 		else {
-			let monthExpected =  houseData.tenants[0].rentOwed
-			while (monthExpected > houseData.house.rent) {
-				monthExpected -= houseData.house.rent
+			let monthExpected = houseDataDB.tenants[0].rentOwed
+			while (monthExpected > houseDataDB.house.rent) {
+				monthExpected -= houseDataDB.house.rent
 			}
 			return monthExpected
 		}
 	}
 
 	function getTotalOverDue(): number {
-		if(houseData.tenants[0] == undefined) {
+		if (houseDataDB.tenants[0] == undefined) {
 			return 0
 		}
-		return houseData.tenants[0].depositOwed + houseData.tenants[0].rentOwed
+		return houseDataDB.tenants[0].depositOwed + houseDataDB.tenants[0].rentOwed
 	}
 
 	const openModal = (action: 'add' | 'edit' | 'delete' | 'payment') => {
@@ -101,19 +130,19 @@ const housePage = () => {
 
 
 	const getTenantsPayment = async () => {
-		if (houseData.tenants[0]) {
+		if (houseDataDB.tenants[0]) {
 			try {
-				const transactions : transactionDBProp[] = []
-				if(userId)
-				await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${houseData.tenants[0].id}/transactions`))
-					.then(transactionsSnapShot => {
+				const transactions: transactionDBProp[] = []
+				if (userId)
+					await getDocs(collection(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}/tenants/${houseDataDB.tenants[0].id}/transactions`))
+						.then(transactionsSnapShot => {
 							// @ts-ignore
-						transactionsSnapShot.forEach(doc => {
-							// @ts-ignore
-							transactions.push({id: doc.id, ...doc.data()})
+							transactionsSnapShot.forEach(doc => {
+								// @ts-ignore
+								transactions.push({ id: doc.id, ...doc.data() })
+							})
+							setTransactionData(transactions)
 						})
-						setTransactionData(transactions)
-					})
 			}
 			catch (e) {
 				// ToastAndroid.show('Failed To Fetch Transactions', ToastAndroid.SHORT)
@@ -123,9 +152,24 @@ const housePage = () => {
 		}
 	}
 
+	const getTenantsData = () => {
+		if (houseDataDB.tenants[0]) {
+			const tenantDocRef = doc(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}/tenants/${houseDataDB.tenants[0].id}`)
+			onSnapshot(tenantDocRef, (tenantDoc) => {
+				if (tenantDoc.exists()) {
+					const tenantData = tenantDoc.data() as tenantProps;
+					setHouseDataDB(prevData => ({
+						...prevData,
+						tenants: [{ ...tenantData, id: tenantDoc.id }],
+					}));
+				}
+			});
+		}
+	}
+
 	useEffect(() => {
 		navigation.setOptions({
-			title: plotName + ' - House ' + houseData.house.houseId,
+			title: plotName + ' - House ' + houseDataDB.house.houseId,
 		})
 		getUserId()
 	}, [])
@@ -134,14 +178,44 @@ const housePage = () => {
 		setMonthlyExpected(getMonthlyExpected())
 		setTotalOverDue(getTotalOverDue())
 
-		const time = houseData.tenants.length > 0 ? calculateTimeDuration(new Date(houseData.tenants[0].moveInDate)) : "2 days"
+		const time = houseDataDB.tenants.length > 0 ? calculateTimeDuration(new Date(houseDataDB.tenants[0].moveInDate)) : "2 days"
 		setMonthsLivedInHouse(Number(time.split(' ')[0]))
 		setDurationLabel(time.split(' ')[1] as 'day' | 'days' | 'week' | 'weeks' | 'month' | 'months' | 'year' | 'years')
-	}, [houseData])
+	}, [houseDataDB])
 
 	useEffect(() => {
+		updateHouseData()
 		getTenantsPayment()
-	}, [userId])
+
+		if (userId && plotId && houseId && houseDataDB.tenants.length > 0) {
+			const houseDocRef = doc(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}`)
+			const tenantDocRef = doc(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}/tenants/${houseDataDB.tenants[0].id}`)
+
+			const unsubscribeHouse = onSnapshot(houseDocRef, (doc) => {
+				if (doc.exists()) {
+					const houseData = doc.data() as houseDataProps
+					setHouseDataDB(prevData => ({
+						...prevData,
+						house: { ...prevData.house, ...houseData, houseId: doc.id },
+					}));
+				}
+			})
+
+			const unsubscribeTenant = onSnapshot(tenantDocRef, (tenantDoc) => {
+				if (tenantDoc.exists()) {
+					const tenantData = tenantDoc.data() as tenantProps;
+					setHouseDataDB(prevData => ({
+						...prevData,
+						tenants: [{ ...tenantData, id: tenantDoc.id }],
+					}));
+				}
+			});
+			return () => {
+				unsubscribeHouse()
+				unsubscribeTenant()
+			}
+		}
+	}, [userId, plotId, houseId])
 
 	useEffect(() => {
 		const valueToCalc =
@@ -155,9 +229,16 @@ const housePage = () => {
 		])
 	}, [monthsLivedInHouse, durationLabel])
 
+	useFocusEffect(
+		useCallback(() => {
+			if (tenantAdded)
+			getTenantsData()
+			setTenantAdded(false)
+		}, [tenantAdded])
+	)
 
 	const renderActions = () => {
-		if (houseData.tenants.length === 0) {
+		if (houseDataDB.tenants.length === 0) {
 			return [{ icon: 'plus', label: 'Add Tenant', onPress: () => openModal('add') }]
 		} else {
 			return [
@@ -168,7 +249,7 @@ const housePage = () => {
 		}
 	}
 
-	(loading || houseData.tenants == undefined || houseData.tenants.length == 0) &&
+	(houseDataDB.tenants == undefined || houseDataDB.tenants.length == 0) &&
 		(
 			<View>
 				<CustomizedText>Loading...</CustomizedText>
@@ -187,28 +268,28 @@ const housePage = () => {
 					<>
 						<Card>
 							<ConfirmView keyHolder="User Id:" value={userId || "No User ID"} />
-							<ConfirmView keyHolder="Plot Id:" value={plotId || "No Plot ID"} />
-							<ConfirmView keyHolder="House Id:" value={houseData.house.houseId || "No House ID"} />
-							<ConfirmView keyHolder="Tenant Id:" value={houseData.house.houseId || "No Tenant ID"} />
+							<ConfirmView keyHolder="Plot Id:" value={plotId as string || "No Plot ID"} />
+							<ConfirmView keyHolder="House Id:" value={houseDataDB.house.houseId || "No House ID"} />
+							<ConfirmView keyHolder="Tenant Id:" value={houseDataDB.house.houseId || "No Tenant ID"} />
 						</Card>
 
 						{/* <Pressable onPress={() => router.push({pathname: '/tenantPage', params: {tenantName: tenantInfo.tenantName}}) }> */}
 						<Card>
 							<Pressable>
 								<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{houseData.tenants.length != 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
-									<CustomizedText>{houseData.house.houseType}</CustomizedText>
+									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{houseDataDB.tenants.length != 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
+									<CustomizedText>{houseDataDB.house.houseType}</CustomizedText>
 								</View>
 
 								{
-									houseData.tenants.length != 0 &&
+									houseDataDB.tenants.length != 0 &&
 									<View style={style.tenantInfoView}>
 										<View style={style.nameNumberView}>
-											<CustomizedText textStyling={style.name}>{`${houseData.tenants[0].firstName} ${houseData.tenants[0].lastName}`}</CustomizedText>
-											<CustomizedText textStyling={style.occupation}>{houseData.tenants[0].occupation}</CustomizedText>
-											<Pressable style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }} onPress={() => handlePhoneClick(houseData.tenants[0].contactInfo)}>
+											<CustomizedText textStyling={style.name}>{`${houseDataDB.tenants[0].firstName} ${houseDataDB.tenants[0].lastName}`}</CustomizedText>
+											<CustomizedText textStyling={style.occupation}>{houseDataDB.tenants[0].occupation}</CustomizedText>
+											<Pressable style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }} onPress={() => handlePhoneClick(houseDataDB.tenants[0].contactInfo)}>
 												<Icon source='phone' size={16} />
-												<CustomizedText textStyling={style.number}>{houseData.tenants[0].contactInfo}</CustomizedText>
+												<CustomizedText textStyling={style.number}>{houseDataDB.tenants[0].contactInfo}</CustomizedText>
 											</Pressable>
 										</View>
 										<View style={style.pieView}>
@@ -233,13 +314,13 @@ const housePage = () => {
 						</Card>
 
 						{
-							houseData.tenants[0] && (
+							houseDataDB.tenants[0] && (
 								<Card>
 									<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
 										<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText} >Deposit</CustomizedText>
 
 										{
-											houseData.tenants[0].depositOwed == 0 && (
+											houseDataDB.tenants[0].depositOwed == 0 && (
 												<View style={{ flexDirection: 'row', gap: 10 }}>
 													<Icon size={20} source='check-all' color='#4caf50' />
 													<CustomizedText>Paid</CustomizedText>
@@ -248,48 +329,48 @@ const housePage = () => {
 										}
 									</View>
 									{
-										houseData.tenants.length != 0 && houseData.tenants[0].depositOwed != 0 &&
-										<PaymentProgress currentAmount={houseData.house.rent - houseData.tenants[0].depositOwed} finalPrice={houseData.house.rent} />
+										houseDataDB.tenants.length != 0 && houseDataDB.tenants[0].depositOwed != 0 &&
+										<PaymentProgress currentAmount={houseDataDB.house.rent - houseDataDB.tenants[0].depositOwed} finalPrice={houseDataDB.house.rent} />
 									}
 								</Card>
 							)
 						}
 
 						{
-							houseData.tenants[0] && (
+							houseDataDB.tenants[0] && (
 								<Card>
 									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Payment</CustomizedText>
 									{
-										getMonthsBetween(houseData.tenants[0].moveInDate).map((month, index, months) => {
+										getMonthsBetween(houseDataDB.tenants[0].moveInDate).map((month, index, months) => {
 											const matchingTransactions = transactionData.filter(transaction => transaction.month === month)
 											const totalAmount = matchingTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
 											let carryover = 0
 											let displayedAmount = totalAmount
 
-											if (totalAmount > houseData.house.rent) {
-												carryover = totalAmount - houseData.house.rent;
-												displayedAmount = houseData.house.rent;
+											if (totalAmount > houseDataDB.house.rent) {
+												carryover = totalAmount - houseDataDB.house.rent;
+												displayedAmount = houseDataDB.house.rent;
 											}
 
 											if (carryover > 0 && index + 1 < months.length) {
 												const nextMonth = months[index + 1];
-												setDoc(doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${houseData.tenants[0].id}/transactions`), {
+												setDoc(doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${houseDataDB.tenants[0].id}/transactions`), {
 													month: nextMonth,
 													amount: carryover,
 													year: new Date().getFullYear()
 												})
 
-												houseData.tenants[0].rentOwed = (houseData.tenants[0].rentOwed || 0) + carryover;
+												houseDataDB.tenants[0].rentOwed = (houseDataDB.tenants[0].rentOwed || 0) + carryover;
 											}
 
-											if (displayedAmount >= houseData.house.rent) {
+											if (displayedAmount >= houseDataDB.house.rent) {
 												return null;
 											}
 
 											return (
 												<Fragment key={index}>
 													<CustomizedText>Month of {month}</CustomizedText>
-													<PaymentProgress currentAmount={displayedAmount} finalPrice={houseData.house.rent} />
+													<PaymentProgress currentAmount={displayedAmount} finalPrice={houseDataDB.house.rent} />
 													{carryover > 0 && <CustomizedText>Carryover to next month: {carryover}</CustomizedText>}
 												</Fragment>
 											)
@@ -300,7 +381,7 @@ const housePage = () => {
 						}
 
 						{
-							houseData.tenants.length !== 0 && (
+							houseDataDB.tenants.length !== 0 && (
 								<Card>
 									<View style={{ flexDirection: 'row' }}>
 										<View style={style.viewHead}>
@@ -323,10 +404,10 @@ const housePage = () => {
 
 			<Portal>
 				<Modal visible={modalVisibility} onDismiss={closeModal} style={{ margin: 20 }}>
-					{modalAction == 'add' && <AddTenant houseId={houseId as string} plotId={plotId} houseRent={houseData.house.rent} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
-					{modalAction == 'edit' && <EditTenant tenantId={houseData.tenants[0].id} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
-					{modalAction == 'delete' && <DeleteTenant tenantInfo={houseData.tenants[0]} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
-					{modalAction == 'payment' && <Payment tenantInfo={houseData.tenants[0]} plotId={Number(plotId)} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
+					{modalAction == 'add' && <AddTenant houseId={houseId as string} plotId={plotId as string} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} tenantAdded={setTenantAdded} />}
+					{modalAction == 'edit' && <EditTenant tenantId={houseDataDB.tenants[0].id} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
+					{modalAction == 'delete' && <DeleteTenant tenantInfo={houseDataDB.tenants[0]} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
+					{modalAction == 'payment' && <Payment userId={userId || ''} plotId={plotId} houseData={houseData} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
 				</Modal>
 			</Portal>
 

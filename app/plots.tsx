@@ -43,7 +43,7 @@ export default function Plots() {
 	}
 
 	const openPlot = (plotName: string, plotId: number | string) => {
-		router.push({ pathname: '/plotPage', params: { plotName, plotId } })
+		router.push({ pathname: '/plotPage', params: { plotId } })
 	}
 
 	const openPlotModal = (action: 'add' | 'edit' | 'delete', plotId: number | string) => {

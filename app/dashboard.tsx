@@ -212,10 +212,10 @@ export default function Dashboard() {
 						<Bar />
 					</Card>
 
-					{/* <Card>
+					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Transactions</CustomizedText>
 						<Table tableTitles={tableTransactionsHeadertexts} tableData={transformedTransactions} />
-					</Card> */}
+					</Card>
 
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Tenants</CustomizedText>
