@@ -2,8 +2,8 @@ import { View, useColorScheme, ScrollView, StyleSheet, ToastAndroid, Linking, Pr
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router'
 import Card, { getCardStyle } from '@/component/Card'
 import CustomizedText from '@/component/CustomizedText'
-import { appFontSize, bigNumberFontSize, getMonthsBetween } from '@/assets/values'
-import { PieChart, PieChartPro  } from 'react-native-gifted-charts'
+import { appFontSize, bigNumberFontSize, calculateTimeDuration, getMonthsBetween } from '@/assets/values'
+import { PieChart, PieChartPro } from 'react-native-gifted-charts'
 import { useSQLiteContext } from 'expo-sqlite'
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, FAB, Icon, MD3Theme, Modal, Portal, Snackbar, useTheme } from 'react-native-paper'
@@ -14,6 +14,11 @@ import { transactionDBProp } from "@/assets/transactions"
 import PaymentProgress from "@/component/PaymentProgress"
 import { tenantProps } from "@/assets/tenants"
 import EditTenant from '@/component/EditTenant'
+import { CombinedHouseTenantData } from './plotPage'
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore'
+import { firestore } from '@/firebaseConfig'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import ConfirmView from '@/component/ConfirmView'
 
 
 interface houseDataProps {
@@ -33,19 +38,21 @@ const housePage = () => {
 	const navigation = useNavigation()
 	const colorScheme = useColorScheme() || 'dark'
 	const style = getHousePageStyles(theme)
-	const { plotName, house, plotId } = useLocalSearchParams()
-	const houseData: houseDataProps = house ? JSON.parse(house as string) : {}
-	const [tenantInfo, setTenantInfo] = useState<tenantProps>({} as tenantProps)
+	const { houseId, plotName, house, plotid } = useLocalSearchParams()
+	const [plotId, setPlotId] = useState<string>(plotid as string)
+	const houseData: CombinedHouseTenantData = house ? JSON.parse(house as string) : {}
 	const [loading, setLoading] = useState<boolean>(true)
 	const [modalVisibility, setModalVisibility] = useState<boolean>(false)
-	const [houseId, setHouseId] = useState<number>(0)
 	const [transactionData, setTransactionData] = useState<transactionDBProp[]>([])
 	const [modalAction, setModalAction] = useState<'add' | 'edit' | 'delete' | 'payment' | null>(null)
 	const [snackbarMsg, setSnackbarMsg] = useState<string>()
 	const [monthlyExpected, setMonthlyExpected] = useState<number>(0)
 	const [totalOverDue, setTotalOverDue] = useState<number>(0)
+	const [userId, setUserId] = useState<string>()
+	const [monthsLivedInHouse, setMonthsLivedInHouse] = useState<number>(0)
+	const [durationLabel, setDurationLabel] = useState<string>()
+	const [pieData, setPieData] = useState<{value: number, color: string}[]>([])
 
-	const [newTenantId, setNewTenantId] = useState<number>(0)
 
 	const [fabOpen, setFabOpen] = useState({ open: false })
 	const onStateChange = ({ open }: any) => setFabOpen({ open })
@@ -55,32 +62,25 @@ const housePage = () => {
 	const onOpenSnackBar = () => setSnackBarVisibility(true)
 	const onDismissSnackBar = () => setSnackBarVisibility(false)
 
-	async function fetchHouseId() {
-		const house: any = await db.getFirstAsync("SELECT id FROM houses WHERE plotId = ? AND houseNumber = ? ", [Number(plotId), houseData.houseNumber])
-		setHouseId(house?.id)
-	}
-
-	async function getTenantInfo() {
-		try {
-			const result: tenantProps = await db.getFirstAsync(`SELECT * FROM tenants WHERE id = ?`, [houseData.tenantId || newTenantId]) || {} as tenantProps
-			setTenantInfo(result)
-		} catch (error) {
-			console.error('Failed to fetch tenant info:', error)
-		} finally {
-			setLoading(false)
-		}
-	}
 
 	function getMonthlyExpected(): number {
-		let monthExpected = tenantInfo.rentOwed
-		while (monthExpected > houseData.rent) {
-			monthExpected -= houseData.rent
+		if (houseData.tenants[0] == undefined) {
+			return 0
 		}
-		return monthExpected
+		else {
+			let monthExpected =  houseData.tenants[0].rentOwed
+			while (monthExpected > houseData.house.rent) {
+				monthExpected -= houseData.house.rent
+			}
+			return monthExpected
+		}
 	}
 
 	function getTotalOverDue(): number {
-		return tenantInfo.depositOwed + tenantInfo.rentOwed
+		if(houseData.tenants[0] == undefined) {
+			return 0
+		}
+		return houseData.tenants[0].depositOwed + houseData.tenants[0].rentOwed
 	}
 
 	const openModal = (action: 'add' | 'edit' | 'delete' | 'payment') => {
@@ -92,55 +92,72 @@ const housePage = () => {
 		setModalVisibility(false)
 	}
 
+	const getUserId = async () => {
+		await AsyncStorage.getItem('userId')
+			.then((id) => {
+				setUserId(id?.toString())
+			})
+	}
+
+
 	const getTenantsPayment = async () => {
-		if (tenantInfo) {
+		if (houseData.tenants[0]) {
 			try {
-				const transactions: transactionDBProp[] = await db.getAllAsync("SELECT * FROM transactions WHERE tenantId = ?", [tenantInfo.id])
-				setTransactionData(transactions)
+				const transactions : transactionDBProp[] = []
+				if(userId)
+				await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${houseData.tenants[0].id}/transactions`))
+					.then(transactionsSnapShot => {
+							// @ts-ignore
+						transactionsSnapShot.forEach(doc => {
+							// @ts-ignore
+							transactions.push({id: doc.id, ...doc.data()})
+						})
+						setTransactionData(transactions)
+					})
 			}
 			catch (e) {
-				ToastAndroid.show('Failed To Fetch Transactions', ToastAndroid.SHORT)
+				// ToastAndroid.show('Failed To Fetch Transactions', ToastAndroid.SHORT)
+				setSnackbarMsg('Failed To Fetch Transactions')
+				onOpenSnackBar()
 			}
 		}
 	}
 
-	const monthsLivedInHouse = Number(houseData.time.split(' ')[0])
-	const durationLabel = houseData.time.split(' ')[1] as 'day' | 'days' | 'week' | 'weeks' | 'month' | 'months' | 'year' | 'years'
-
-	const valueToCalc =
-		(durationLabel == 'year' || durationLabel == 'years') ? 5 :
-			(durationLabel == 'month' || durationLabel == 'months') ? 12 :
-				(durationLabel == 'day' || durationLabel == 'days') ? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() : 0
-
-	const pieData = [
-		{ value: monthsLivedInHouse, color: theme.colors.primary },
-		{ value: valueToCalc - monthsLivedInHouse, color: colorScheme == 'dark' ? theme.colors.surface : theme.colors.primary }
-	]
-
 	useEffect(() => {
 		navigation.setOptions({
-			title: plotName + ' - House ' + houseData.houseNumber,
+			title: plotName + ' - House ' + houseData.house.houseId,
 		})
-		fetchHouseId()
-		getTenantInfo()
+		getUserId()
 	}, [])
 
 	useEffect(() => {
 		setMonthlyExpected(getMonthlyExpected())
 		setTotalOverDue(getTotalOverDue())
-	}, [tenantInfo])
 
-	useEffect(() => {
-		if (!modalVisibility)
-		getTenantInfo()
-	}, [modalVisibility])
+		const time = houseData.tenants.length > 0 ? calculateTimeDuration(new Date(houseData.tenants[0].moveInDate)) : "2 days"
+		setMonthsLivedInHouse(Number(time.split(' ')[0]))
+		setDurationLabel(time.split(' ')[1] as 'day' | 'days' | 'week' | 'weeks' | 'month' | 'months' | 'year' | 'years')
+	}, [houseData])
 
 	useEffect(() => {
 		getTenantsPayment()
-	}, [tenantInfo])
+	}, [userId])
+
+	useEffect(() => {
+		const valueToCalc =
+			(durationLabel == 'year' || durationLabel == 'years') ? 5 :
+				(durationLabel == 'month' || durationLabel == 'months') ? 12 :
+					(durationLabel == 'day' || durationLabel == 'days') ? new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() : 0
+
+		setPieData([
+			{ value: monthsLivedInHouse, color: theme.colors.primary },
+			{ value: valueToCalc - monthsLivedInHouse, color: colorScheme == 'dark' ? theme.colors.surface : theme.colors.primary }
+		])
+	}, [monthsLivedInHouse, durationLabel])
+
 
 	const renderActions = () => {
-		if (Object.keys(tenantInfo).length === 0) {
+		if (houseData.tenants.length === 0) {
 			return [{ icon: 'plus', label: 'Add Tenant', onPress: () => openModal('add') }]
 		} else {
 			return [
@@ -151,7 +168,7 @@ const housePage = () => {
 		}
 	}
 
-	loading || tenantInfo == undefined &&
+	(loading || houseData.tenants == undefined || houseData.tenants.length == 0) &&
 		(
 			<View>
 				<CustomizedText>Loading...</CustomizedText>
@@ -167,123 +184,138 @@ const housePage = () => {
 		<>
 			<ScrollView style={style.scrollView}>
 				<View style={style.view}>
-					<Card>
-						<Pressable onPress={() => router.push({pathname: '/tenantPage', params: {tenantName: tenantInfo.tenantName}}) }>
-							<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-								<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{Object.keys(tenantInfo).length != 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
-								<CustomizedText>{houseData.houseType}</CustomizedText>
-							</View>
+					<>
+						<Card>
+							<ConfirmView keyHolder="User Id:" value={userId || "No User ID"} />
+							<ConfirmView keyHolder="Plot Id:" value={plotId || "No Plot ID"} />
+							<ConfirmView keyHolder="House Id:" value={houseData.house.houseId || "No House ID"} />
+							<ConfirmView keyHolder="Tenant Id:" value={houseData.house.houseId || "No Tenant ID"} />
+						</Card>
 
-							{
-								Object.keys(tenantInfo).length != 0 &&
-								<View style={style.tenantInfoView}>
-									<View style={style.nameNumberView}>
-										<CustomizedText textStyling={style.name}>{tenantInfo.tenantName}</CustomizedText>
-										<CustomizedText textStyling={style.occupation}>{tenantInfo.occupation}</CustomizedText>
-										<Pressable style={{flexDirection: 'row', gap: 10, alignItems: 'center'}} onPress={() => handlePhoneClick(tenantInfo.contactInfo)}>
-											<Icon source='phone' size={16} />
-											<CustomizedText textStyling={style.number}>{tenantInfo.contactInfo}</CustomizedText>
-										</Pressable>
-									</View>
-									<View style={style.pieView}>
-										<PieChart
-											donut
-											radius={60}
-											innerRadius={55}
-											innerCircleColor={theme.colors.elevation.level1}
-											data={pieData}
-											centerLabelComponent={() => (
-												<CustomizedText textStyling={{ textAlign: 'center' }}>
-													<CustomizedText textStyling={{ fontSize: 24 }} >{monthsLivedInHouse}</CustomizedText>
-													{'\n'}
-													{durationLabel}
-												</CustomizedText>
-											)}
-										/>
-									</View>
-								</View>
-							}
-						</Pressable>
-					</Card>
-
-					{
-						tenantInfo && (
-							<Card>
+						{/* <Pressable onPress={() => router.push({pathname: '/tenantPage', params: {tenantName: tenantInfo.tenantName}}) }> */}
+						<Card>
+							<Pressable>
 								<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText} >Deposit</CustomizedText>
+									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{houseData.tenants.length != 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
+									<CustomizedText>{houseData.house.houseType}</CustomizedText>
+								</View>
 
+								{
+									houseData.tenants.length != 0 &&
+									<View style={style.tenantInfoView}>
+										<View style={style.nameNumberView}>
+											<CustomizedText textStyling={style.name}>{`${houseData.tenants[0].firstName} ${houseData.tenants[0].lastName}`}</CustomizedText>
+											<CustomizedText textStyling={style.occupation}>{houseData.tenants[0].occupation}</CustomizedText>
+											<Pressable style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }} onPress={() => handlePhoneClick(houseData.tenants[0].contactInfo)}>
+												<Icon source='phone' size={16} />
+												<CustomizedText textStyling={style.number}>{houseData.tenants[0].contactInfo}</CustomizedText>
+											</Pressable>
+										</View>
+										<View style={style.pieView}>
+											<PieChart
+												donut
+												radius={60}
+												innerRadius={55}
+												innerCircleColor={theme.colors.elevation.level1}
+												data={pieData || [{ value: 0, color: theme.colors.elevation.level1 }]}
+												centerLabelComponent={() => (
+													<CustomizedText textStyling={{ textAlign: 'center' }}>
+														<CustomizedText textStyling={{ fontSize: 24 }} >{monthsLivedInHouse}</CustomizedText>
+														{'\n'}
+														{durationLabel}
+													</CustomizedText>
+												)}
+											/>
+										</View>
+									</View>
+								}
+							</Pressable>
+						</Card>
+
+						{
+							houseData.tenants[0] && (
+								<Card>
+									<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+										<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText} >Deposit</CustomizedText>
+
+										{
+											houseData.tenants[0].depositOwed == 0 && (
+												<View style={{ flexDirection: 'row', gap: 10 }}>
+													<Icon size={20} source='check-all' color='#4caf50' />
+													<CustomizedText>Paid</CustomizedText>
+												</View>
+											)
+										}
+									</View>
 									{
-										tenantInfo.depositOwed == 0 && (
-											<View style={{ flexDirection: 'row', gap: 10 }}>
-												<Icon size={20} source='check-all' color='#4caf50' />
-												<CustomizedText>Paid</CustomizedText>
-											</View>
-										)
+										houseData.tenants.length != 0 && houseData.tenants[0].depositOwed != 0 &&
+										<PaymentProgress currentAmount={houseData.house.rent - houseData.tenants[0].depositOwed} finalPrice={houseData.house.rent} />
 									}
-								</View>
-								{
-									Object.keys(tenantInfo).length != 0 && tenantInfo.depositOwed != 0 &&
-									<PaymentProgress currentAmount={houseData.rent - tenantInfo.depositOwed} finalPrice={houseData.rent} />
-								}
-							</Card>
-						)
-					}
+								</Card>
+							)
+						}
 
-					{
-						tenantInfo && (
-							<Card>
-								<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Payment</CustomizedText>
-								{
-									getMonthsBetween(tenantInfo.moveInDate).map((month, index, months) => {
-										const matchingTransactions = transactionData.filter(transaction => transaction.month === month)
-										const totalAmount = matchingTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
-										let carryover = 0
-										let displayedAmount = totalAmount
+						{
+							houseData.tenants[0] && (
+								<Card>
+									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Payment</CustomizedText>
+									{
+										getMonthsBetween(houseData.tenants[0].moveInDate).map((month, index, months) => {
+											const matchingTransactions = transactionData.filter(transaction => transaction.month === month)
+											const totalAmount = matchingTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
+											let carryover = 0
+											let displayedAmount = totalAmount
 
-										if (totalAmount > houseData.rent) {
-											carryover = totalAmount - houseData.rent;
-											displayedAmount = houseData.rent;
-										}
+											if (totalAmount > houseData.house.rent) {
+												carryover = totalAmount - houseData.house.rent;
+												displayedAmount = houseData.house.rent;
+											}
 
-										if (carryover > 0 && index + 1 < months.length) {
-											const nextMonth = months[index + 1];
-											db.runAsync('INSERT INTO transactions (tenantId, month, amount, year) VALUES(?, ?, ?, ?)', [tenantInfo.id, nextMonth, carryover, 2024])
-											tenantInfo.rentOwed = (tenantInfo.rentOwed || 0) + carryover;
-										}
+											if (carryover > 0 && index + 1 < months.length) {
+												const nextMonth = months[index + 1];
+												setDoc(doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${houseData.tenants[0].id}/transactions`), {
+													month: nextMonth,
+													amount: carryover,
+													year: new Date().getFullYear()
+												})
 
-										if (displayedAmount >= houseData.rent) {
-											return null;
-										}
+												houseData.tenants[0].rentOwed = (houseData.tenants[0].rentOwed || 0) + carryover;
+											}
 
-										return (
-											<Fragment key={index}>
-												<CustomizedText>Month of {month}</CustomizedText>
-												<PaymentProgress currentAmount={displayedAmount} finalPrice={houseData.rent} />
-												{carryover > 0 && <CustomizedText>Carryover to next month: {carryover}</CustomizedText>}
-											</Fragment>
-										)
-									})
-								}
-							</Card>
-						)
-					}
+											if (displayedAmount >= houseData.house.rent) {
+												return null;
+											}
 
-					{
-						Object.keys(tenantInfo).length !== 0 && (
-							<Card>
-								<View style={{ flexDirection: 'row' }}>
-									<View style={ style.viewHead }>
-										<CustomizedText textStyling={style.expected}>Monthly Expected</CustomizedText>
-										<CustomizedText textStyling={style.amount}>Ksh {new Intl.NumberFormat().format(monthlyExpected)}</CustomizedText>
+											return (
+												<Fragment key={index}>
+													<CustomizedText>Month of {month}</CustomizedText>
+													<PaymentProgress currentAmount={displayedAmount} finalPrice={houseData.house.rent} />
+													{carryover > 0 && <CustomizedText>Carryover to next month: {carryover}</CustomizedText>}
+												</Fragment>
+											)
+										})
+									}
+								</Card>
+							)
+						}
+
+						{
+							houseData.tenants.length !== 0 && (
+								<Card>
+									<View style={{ flexDirection: 'row' }}>
+										<View style={style.viewHead}>
+											<CustomizedText textStyling={style.expected}>Monthly Expected</CustomizedText>
+											<CustomizedText textStyling={style.amount}>Ksh {new Intl.NumberFormat().format(monthlyExpected)}</CustomizedText>
+										</View>
+										<View style={[style.viewHead, { alignItems: 'flex-end' }]}>
+											<CustomizedText textStyling={style.expected}>Total Overdue</CustomizedText>
+											<CustomizedText textStyling={style.amount}>{`Ksh ${new Intl.NumberFormat().format(totalOverDue)}`}</CustomizedText>
+										</View>
 									</View>
-									<View style={[style.viewHead, { alignItems: 'flex-end'}]}>
-										<CustomizedText textStyling={style.expected}>Total Overdue</CustomizedText>
-										<CustomizedText textStyling={style.amount}>{`Ksh ${new Intl.NumberFormat().format(totalOverDue)}`}</CustomizedText>
-									</View>
-								</View>
-							</Card>
-						)
-					}
+								</Card>
+							)
+						}
+					</>
 				</View >
 			</ScrollView >
 
@@ -291,10 +323,10 @@ const housePage = () => {
 
 			<Portal>
 				<Modal visible={modalVisibility} onDismiss={closeModal} style={{ margin: 20 }}>
-					{modalAction == 'add' && <AddTenant houseId={houseId} plotId={Number(plotId)} houseRent={houseData.rent} closeAddTenantModal={closeModal}  setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} setTenantId={setNewTenantId}/>}
-					{modalAction == 'edit' && <EditTenant tenantId={tenantInfo.id} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
-					{modalAction == 'delete' && <DeleteTenant tenantInfo={tenantInfo} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
-					{modalAction == 'payment' && <Payment tenantInfo={tenantInfo} plotId={Number(plotId)} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
+					{modalAction == 'add' && <AddTenant houseId={houseId as string} plotId={plotId} houseRent={houseData.house.rent} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
+					{modalAction == 'edit' && <EditTenant tenantId={houseData.tenants[0].id} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
+					{modalAction == 'delete' && <DeleteTenant tenantInfo={houseData.tenants[0]} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
+					{modalAction == 'payment' && <Payment tenantInfo={houseData.tenants[0]} plotId={Number(plotId)} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
 				</Modal>
 			</Portal>
 

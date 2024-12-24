@@ -29,8 +29,7 @@ export const allTransactionsData = [
 
 
 export interface transactionDBProp {
-    id: number
-    tenantId: number
+    id: string
     amount: number
     month: string
     year: number

@@ -10,7 +10,7 @@ import { useSQLiteContext } from 'expo-sqlite'
 import ConfirmView from './ConfirmView'
 
 interface editTenantProps {
-	tenantId: number
+	tenantId: string
 	openSnackBar: () => void
 	closeModal: () => void
 	setSnackbarMsg: (msg: string) => void
@@ -25,11 +25,11 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 	const [tenantInfo, setTenantInfo] = useState<tenantProps>()
 	const initialFormData: tenantFormProps = { id: 0, houseId: 0, tenantName: '', firstName: '', lastName: '', contactInfo: '', moveInDate: new Date(), occupation: '', rentOwed: 0, depositOwed: 0 }
 	const [formData, setFormData] = useState(initialFormData)
-	
+
 
 	const getTenantData = async () => {
 		// setHouseData
-		let data : tenantProps = await db.getFirstAsync('SELECT * FROM tenants WHERE id = ?', [tenantId]) || {} as tenantProps
+		let data: tenantProps = await db.getFirstAsync('SELECT * FROM tenants WHERE id = ?', [tenantId]) || {} as tenantProps
 		setTenantInfo(data)
 
 		setFormData({
@@ -69,16 +69,16 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 
 	const submitForm = async () => {
 		closeModal()
-		try{
+		try {
 			await db.runAsync('UPDATE tenants SET tenantName = ?, contactInfo = ?, occupation = ?, depositOwed = ?, rentOwed = ? WHERE id = ?', [formData.tenantName, formData.contactInfo, formData.occupation, formData.depositOwed, formData.rentOwed, tenantId])
 			setSnackbarMsg('Tenant\'s data has been updated')
 			openSnackBar()
 		}
-		catch(e) {
+		catch (e) {
 			Alert.alert('ERROR', `${e}`)
 		}
 	}
-	
+
 
 	const renderStep = () => {
 		switch (currentStep) {
