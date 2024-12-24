@@ -11,7 +11,7 @@ import { getMonthsBetween } from '@/assets/values'
 import { getModalStyle } from './CustomModal'
 import ConfirmView from './ConfirmView'
 import { plotsProps } from '@/assets/plots'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
 import { firestore } from '@/firebaseConfig'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import houses from '@/app/houses'
@@ -40,23 +40,15 @@ const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackba
 
 	const [ userId, setUserId ] = useState<string>()
 
-
-	const handleInputChange = (field: keyof tenantFormProps, value: string | number | Date) => {
-		// setFormData(prevState => {
-		// 	const updatedForm = { ...prevState, [field]: value }
-		// 	if (field === 'firstName' || field === 'lastName') {
-		// 		updatedForm.tenantName = `${updatedForm.firstName.trim()} ${updatedForm.lastName.trim()}`
-		// 	}
-		// 	return updatedForm
-		// })
-		setFormData(prevState => ({ ...prevState, [field]: value }))
-	}
-
 	const getUserId = async () => {
 		await AsyncStorage.getItem('userId')
 			.then((id) => {
 				setUserId(id?.toString())
 			})
+	}
+
+	const handleInputChange = (field: keyof tenantFormProps, value: string | number | Date) => {
+		setFormData(prevState => ({ ...prevState, [field]: value }))
 	}
 
 	const handleNext = () => {
@@ -76,20 +68,11 @@ const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackba
 	}
 
 	const addTenantToDB = async (formData: tenantFormProps, userId: string) => {
-		// Get Occupied Houses
-		// const plotData: { numberOccupiedHouses: number } = await db.getFirstAsync('SELECT numberOccupiedHouses FROM plots WHERE id = ?', [plotId]) || { numberOccupiedHouses: 0 };
 		let numberOccupiedHouses = 0
 		if (userId)
-		await getDoc(doc(firestore, `/users/${userId}/plots/${plotId}`))
-			.then((doc) => {
-				const plotData = doc.data()
-				console.log(plotData)
-				numberOccupiedHouses = plotData?.numberOccupiedHouses || 0
-			})
-
-
-		await setDoc(doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants`), formData)
+		await addDoc(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants`), formData)
 			.then(() => {
+				console.log('Tenant added successfully.')
 				closeAddTenantModal()
 				setSnackbarMsg(`${formData.firstName} ${formData.lastName} added successful.`)
 				onOpenSnackBar()
@@ -97,22 +80,32 @@ const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackba
 			.catch((error) => {
 				console.error(error)
 			})
+			.finally(()	=> {
+				Alert.alert('Tenant Added', 'Tenant added successfully.')
+			})
+		let plotData = {} as plotsProps
+		await getDoc(doc(firestore, `/users/${userId}/plots/${plotId}`))
+			.then((doc) => {
+				const plotDataDB = doc.data()
+				plotData = plotDataDB as plotsProps
+				numberOccupiedHouses = plotData?.numberOccupiedHouses || 0
+			}).
+			catch((error) => {
+				console.error(error)
+			})
 
-		await setDoc(doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}`), {
+		await setDoc(doc(firestore, `/users/${userId}/plots/${plotId}`), {
+			...plotData,
 			numberOccupiedHouses: numberOccupiedHouses + 1
 		})
 		.then(() => {
+			console.log('Number of occupied houses updated.')
 			setSnackbarMsg('Number of occupied houses updated.')
 			onOpenSnackBar()
 		})
 		.catch((error) => {
 			console.error(error)
 		})
-
-
-		// (tenantInsertResult.changes === 1 && updatePlotResult.changes === 1) ? setTenantAdded(!tenantAdded) : console.error('Error adding tenant or updating plot.')
-
-
 	}
 
 	const handleSubmit = async (formData: Partial<tenantFormProps>, userId: string) => {
