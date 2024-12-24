@@ -14,19 +14,17 @@ import { plotsProps } from '@/assets/plots'
 import { addDoc, collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
 import { firestore } from '@/firebaseConfig'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import houses from '@/app/houses'
 
 type addTenantProps = {
 	houseId: string
 	plotId: string
-	houseRent: number
-	// setTenantId: (id: number) => void
 	closeAddTenantModal: () => void
 	onOpenSnackBar: () => void
 	setSnackbarMsg: (msg: string) => void
+	tenantAdded: (state: boolean) => void
 }
 
-const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackbarMsg, onOpenSnackBar }: addTenantProps) => {
+const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpenSnackBar, tenantAdded }: addTenantProps) => {
 	const db = useSQLiteContext()
 	const colorScheme = useColorScheme() || 'dark'
 	const theme = useTheme()
@@ -102,6 +100,7 @@ const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackba
 			console.log('Number of occupied houses updated.')
 			setSnackbarMsg('Number of occupied houses updated.')
 			onOpenSnackBar()
+			tenantAdded(true)
 		})
 		.catch((error) => {
 			console.error(error)

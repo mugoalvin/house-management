@@ -9,24 +9,30 @@ import { useSQLiteContext } from 'expo-sqlite'
 import {tenantProps} from "@/assets/tenants";
 import { getModalStyle } from './CustomModal'
 import ConfirmView from './ConfirmView'
+import { addDoc, collection, doc, getDoc, setDoc } from 'firebase/firestore'
+import { firestore } from '@/firebaseConfig'
+import { CombinedHouseTenantData } from '@/app/plotPage'
+import { plotsProps } from '@/assets/plots'
 
 interface PaymentProps {
-	tenantInfo: tenantProps
-	plotId: number
+	userId: string
+	plotId: string
+	houseData: CombinedHouseTenantData
 	closeModal: () => void
 	openSnackBar: () => void
 	setSnackbarMsg: (msg: string) => void
 }
 
-const Payment = ({tenantInfo, plotId, closeModal, openSnackBar, setSnackbarMsg}: PaymentProps) => {
+const Payment = ({userId,  plotId, houseData, closeModal, openSnackBar, setSnackbarMsg}: PaymentProps) => {
 	const db = useSQLiteContext()
 	const theme = useTheme()
 	const colorScheme = useColorScheme() || 'dark'
 	const maxRenderSteps = 2
 	const [ currentStep, setCurrentStep ] = useState<number>(1)
-	const initialFormData = {id: 0 , tenantId: tenantInfo.id , month: '' , amount: 0 , year: new Date().getFullYear() , transactionDate: new Date()}
+	const initialFormData = {id: '' , tenantId: houseData.tenants[0].id , month: '' , amount: 0 , year: '' , transactionDate: new Date()}
 	const [ formData, setFormData ] = useState<typeof initialFormData>(initialFormData)
 	const [ paidHouses, setPaidHouses ] = useState<number>(0)
+	const [plotData, setPlotData] = useState<plotsProps>()
 
 	const handleNext = () => {
 		if (currentStep < 2) setCurrentStep(currentStep + 1);
@@ -43,8 +49,18 @@ const Payment = ({tenantInfo, plotId, closeModal, openSnackBar, setSnackbarMsg}:
 	}
 
 	const fetchPaidHouses = async () => {
-		const result : {paidHouses: number} = await db.getFirstAsync('SELECT paidHouses FROM plots WHERE id = ?', [plotId]) || {} as {paidHouses: number}
-		setPaidHouses(result.paidHouses)
+		// const result : {paidHouses: number} = await db.getFirstAsync('SELECT paidHouses FROM plots WHERE id = ?', [plotId]) || {} as {paidHouses: number}
+		let paidHouses = 0
+		// const plotRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseData.house.houseId}`)
+		const plotRef = doc(firestore, `/users/${userId}/plots/${plotId}`)
+		getDoc(plotRef).then((doc) => {
+			if (doc.exists()) {
+				const data = doc.data() as plotsProps
+				console.log(data)
+				setPlotData(data)
+				setPaidHouses(data.paidHouses)
+			}
+		})
 	}
 
 	useEffect(() => {
@@ -55,23 +71,56 @@ const Payment = ({tenantInfo, plotId, closeModal, openSnackBar, setSnackbarMsg}:
 		try {
 			let remainingAmount = Number(formData.amount)
 
-			if (tenantInfo.depositOwed > 0) {
-				if (remainingAmount >= tenantInfo.depositOwed) {
-					remainingAmount -= tenantInfo.depositOwed;
-					tenantInfo.depositOwed = 0;
+			if (houseData.tenants[0].depositOwed > 0) {
+				if (remainingAmount >= houseData.tenants[0].depositOwed) {
+					remainingAmount -= houseData.tenants[0].depositOwed;
+					houseData.tenants[0].depositOwed = 0;
 				} else {
-					tenantInfo.depositOwed -= remainingAmount;
+					houseData.tenants[0].depositOwed -= remainingAmount;
 					remainingAmount = 0;
 				}
 			}
 
 			if (remainingAmount > 0) {
-				tenantInfo.rentOwed -= remainingAmount;
+				houseData.tenants[0].rentOwed -= remainingAmount;
 			}
 
-			await db.runAsync('INSERT INTO transactions (tenantId, month, amount, year, transactionDate) VALUES(?, ?, ?, ?, ?)', [formData.tenantId, formData.month, Number(formData.amount), formData.year, new Date().toString()]);
-			await db.runAsync('UPDATE tenants SET rentOwed = ?, depositOwed = ? WHERE id = ?', [tenantInfo.rentOwed, tenantInfo.depositOwed, tenantInfo.id])
-			tenantInfo.rentOwed == 0 && await db.runAsync('UPDATE plots SET paidHouses = ?', [paidHouses + 1])
+			// await db.runAsync('INSERT INTO transactions (tenantId, month, amount, year, transactionDate) VALUES(?, ?, ?, ?, ?)', [formData.tenantId, formData.month, Number(formData.amount), formData.year, new Date().toString()]);
+			addDoc(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseData.house.houseId}/tenants/${houseData.tenants[0].id}/transactions`), {
+				month: formData.month,
+				amount: Number(formData.amount),
+				year: formData.year,
+				transactionDate: new Date().toISOString()
+			}).then(() => {
+				console.log('Transaction added successfully')
+			}).catch((e) => {
+				console.error(e)
+			})
+
+			// await db.runAsync('UPDATE tenants SET rentOwed = ?, depositOwed = ? WHERE id = ?', [houseData.tenants[0].rentOwed, houseData.tenants[0].depositOwed, houseData.tenants[0].id])
+			const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseData.house.houseId}/tenants/${houseData.tenants[0].id}`)
+			await setDoc(tenantRef, {
+				...houseData.tenants[0],
+				rentOwed:  houseData.tenants[0].rentOwed,
+				depositOwed:  houseData.tenants[0].depositOwed
+			}).then(() => {
+				console.log('Tenant updated successfully')
+			}).catch((e) => {
+				console.error(e)
+			})
+
+
+			// houseData.tenants[0].rentOwed == 0 && await db.runAsync('UPDATE plots SET paidHouses = ?', [paidHouses + 1])
+			const plotRef = doc(firestore, `/users/${userId}/plots/${plotId}`)
+			setDoc(plotRef, {
+				...plotData,
+				paidHouses: paidHouses + 1
+			}).then(() => {
+				console.log('Plot updated successfully')
+			}).catch((e) => {
+				console.error(e)
+			})
+
 			closeModal()
 			setSnackbarMsg(`Payment of ${formData.amount} made successfully.`)
 			openSnackBar()
@@ -90,8 +139,8 @@ const Payment = ({tenantInfo, plotId, closeModal, openSnackBar, setSnackbarMsg}:
 			case 1:
 				return (
 					<View>
-						{ tenantInfo.depositOwed != 0 && <CustomizedText>Deposit Remaining: {tenantInfo.depositOwed}</CustomizedText> }
-						{ tenantInfo.rentOwed != 0 && <CustomizedText>Rent Remaining: {tenantInfo.rentOwed}</CustomizedText> }
+						{ houseData.tenants[0].depositOwed != 0 && <CustomizedText>Deposit Remaining: {houseData.tenants[0].depositOwed}</CustomizedText> }
+						{ houseData.tenants[0].rentOwed != 0 && <CustomizedText>Rent Remaining: {houseData.tenants[0].rentOwed}</CustomizedText> }
 
 						<TextInput
 							mode='outlined'
@@ -102,7 +151,7 @@ const Payment = ({tenantInfo, plotId, closeModal, openSnackBar, setSnackbarMsg}:
 						/>
 
 						{
-							tenantInfo.depositOwed == 0 &&
+							houseData.tenants[0].depositOwed == 0 &&
 								<DropDown
 									data={getMonths()}
 									onSelect={(value) => handleInputChange('month', value.toString())}
@@ -113,7 +162,6 @@ const Payment = ({tenantInfo, plotId, closeModal, openSnackBar, setSnackbarMsg}:
 						<TextInput
 							label='Enter Year'
 							mode='outlined'
-							value={new Date().getFullYear().toString()}
 							onChangeText={(year) => handleInputChange('year', Number(year))}
 							style={getModalStyle(colorScheme, theme).textInput}
 							keyboardType='numeric'
