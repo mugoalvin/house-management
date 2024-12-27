@@ -97,7 +97,7 @@ const housePage = () => {
 			return 0
 		}
 		else {
-			let monthExpected = houseDataDB.tenants[0].rentOwed
+			let monthExpected = houseDataDB.tenants[0].rentOwed || 0
 			while (monthExpected > houseDataDB.house.rent) {
 				monthExpected -= houseDataDB.house.rent
 			}
@@ -109,7 +109,7 @@ const housePage = () => {
 		if (houseDataDB.tenants[0] == undefined) {
 			return 0
 		}
-		return houseDataDB.tenants[0].depositOwed + houseDataDB.tenants[0].rentOwed
+		return (houseDataDB.tenants[0].depositOwed as number) + (houseDataDB.tenants[0].rentOwed as number)
 	}
 
 	const openModal = (action: 'add' | 'edit' | 'delete' | 'payment') => {
@@ -178,7 +178,7 @@ const housePage = () => {
 		setMonthlyExpected(getMonthlyExpected())
 		setTotalOverDue(getTotalOverDue())
 
-		const time = houseDataDB.tenants.length > 0 ? calculateTimeDuration(new Date(houseDataDB.tenants[0].moveInDate)) : "2 days"
+		const time = houseDataDB.tenants.length > 0 && houseDataDB.tenants[0].moveInDate ? calculateTimeDuration(new Date(houseDataDB.tenants[0].moveInDate)) : "2 days"
 		setMonthsLivedInHouse(Number(time.split(' ')[0]))
 		setDurationLabel(time.split(' ')[1] as 'day' | 'days' | 'week' | 'weeks' | 'month' | 'months' | 'year' | 'years')
 	}, [houseDataDB])
@@ -287,7 +287,7 @@ const housePage = () => {
 										<View style={style.nameNumberView}>
 											<CustomizedText textStyling={style.name}>{`${houseDataDB.tenants[0].firstName} ${houseDataDB.tenants[0].lastName}`}</CustomizedText>
 											<CustomizedText textStyling={style.occupation}>{houseDataDB.tenants[0].occupation}</CustomizedText>
-											<Pressable style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }} onPress={() => handlePhoneClick(houseDataDB.tenants[0].contactInfo)}>
+											<Pressable style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }} onPress={() => houseDataDB.tenants[0].contactInfo && handlePhoneClick(houseDataDB.tenants[0].contactInfo)}>
 												<Icon source='phone' size={16} />
 												<CustomizedText textStyling={style.number}>{houseDataDB.tenants[0].contactInfo}</CustomizedText>
 											</Pressable>
@@ -330,7 +330,7 @@ const housePage = () => {
 									</View>
 									{
 										houseDataDB.tenants.length != 0 && houseDataDB.tenants[0].depositOwed != 0 &&
-										<PaymentProgress currentAmount={houseDataDB.house.rent - houseDataDB.tenants[0].depositOwed} finalPrice={houseDataDB.house.rent} />
+										<PaymentProgress currentAmount={houseDataDB.house.rent - (houseDataDB.tenants[0].depositOwed ? houseDataDB.tenants[0].depositOwed : 0) } finalPrice={houseDataDB.house.rent} />
 									}
 								</Card>
 							)
@@ -341,7 +341,7 @@ const housePage = () => {
 								<Card>
 									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Payment</CustomizedText>
 									{
-										getMonthsBetween(houseDataDB.tenants[0].moveInDate).map((month, index, months) => {
+										getMonthsBetween(houseDataDB.tenants[0].moveInDate || new Date()).map((month, index, months) => {
 											const matchingTransactions = transactionData.filter(transaction => transaction.month === month)
 											const totalAmount = matchingTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
 											let carryover = 0
@@ -405,8 +405,8 @@ const housePage = () => {
 			<Portal>
 				<Modal visible={modalVisibility} onDismiss={closeModal} style={{ margin: 20 }}>
 					{modalAction == 'add' && <AddTenant houseId={houseId as string} plotId={plotId as string} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} tenantAdded={setTenantAdded} />}
-					{modalAction == 'edit' && <EditTenant tenantId={houseDataDB.tenants[0].id} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
-					{modalAction == 'delete' && <DeleteTenant tenantInfo={houseDataDB.tenants[0]} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
+					{modalAction == 'edit' && <EditTenant tenantId={houseDataDB.tenants[0].id || ''} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
+					{modalAction == 'delete' && houseDataDB.tenants[0]?.id && <DeleteTenant tenantInfo={houseDataDB.tenants[0] as tenantProps} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
 					{modalAction == 'payment' && <Payment userId={userId || ''} plotId={plotId} houseData={houseData} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
 				</Modal>
 			</Portal>

@@ -23,7 +23,7 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 	const maxRenderSteps = 5
 	const [currentStep, setCurrentStep] = useState<number>(1)
 	const [tenantInfo, setTenantInfo] = useState<tenantProps>()
-	const initialFormData: tenantFormProps = { id: 0, houseId: 0, tenantName: '', firstName: '', lastName: '', contactInfo: '', moveInDate: new Date(), occupation: '', rentOwed: 0, depositOwed: 0 }
+	const initialFormData: tenantFormProps = { id: '', firstName: '', lastName: '', contactInfo: '', moveInDate: new Date(), occupation: '', rentOwed: 0, depositOwed: 0 }
 	const [formData, setFormData] = useState(initialFormData)
 
 
@@ -33,11 +33,11 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 		setTenantInfo(data)
 
 		setFormData({
-			id: data?.id || 0,
-			houseId: data?.houseId || 0,
-			tenantName: data?.tenantName || '',
-			firstName: data?.tenantName.split(' ')[0] || '',
-			lastName: data?.tenantName.split(' ')[1] || '',
+			id: data?.id || '',
+			// houseId: data?.houseId || '',
+			// tenantName: data?.tenantName || '',
+			firstName: data?.firstName,
+			lastName: data?.lastName,
 			contactInfo: data?.contactInfo || '',
 			moveInDate: data?.moveInDate || new Date,
 			occupation: data?.occupation || '',
@@ -53,9 +53,9 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 	const handleInputChange = (field: keyof tenantFormProps, value: string | number | Date) => {
 		setFormData(prevState => {
 			const updatedForm = { ...prevState, [field]: value }
-			if (field === 'firstName' || field === 'lastName') {
-				updatedForm.tenantName = `${updatedForm.firstName.trim()} ${updatedForm.lastName.trim()}`
-			}
+			// if (field === 'firstName' || field === 'lastName') {
+			// 	updatedForm.tenantName = `${updatedForm.firstName.trim()} ${updatedForm.lastName.trim()}`
+			// }
 			return updatedForm
 		})
 	}
@@ -70,7 +70,7 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 	const submitForm = async () => {
 		closeModal()
 		try {
-			await db.runAsync('UPDATE tenants SET tenantName = ?, contactInfo = ?, occupation = ?, depositOwed = ?, rentOwed = ? WHERE id = ?', [formData.tenantName, formData.contactInfo, formData.occupation, formData.depositOwed, formData.rentOwed, tenantId])
+			// await db.runAsync('UPDATE tenants SET tenantName = ?, contactInfo = ?, occupation = ?, depositOwed = ?, rentOwed = ? WHERE id = ?', [formData.tenantName, formData.contactInfo, formData.occupation, formData.depositOwed, formData.rentOwed, tenantId])
 			setSnackbarMsg('Tenant\'s data has been updated')
 			openSnackBar()
 		}
@@ -161,7 +161,7 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 					<>
 						<View>
 							<CustomizedText textStyling={getModalStyle(colorScheme, theme).step}>Step 5: Confirmation</CustomizedText>
-							<ConfirmView keyHolder='Name' value={formData.tenantName} />
+							<ConfirmView keyHolder='Name' value={`${formData.firstName} ${formData.lastName}`} />
 							<ConfirmView keyHolder='Phone No' value={formData.contactInfo} />
 							<ConfirmView keyHolder='Profession' value={formData.occupation} />
 							<ConfirmView keyHolder='Deposit Owed' value={formData.depositOwed} />

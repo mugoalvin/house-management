@@ -19,7 +19,7 @@ import CustomizedText from "@/component/CustomizedText";
 import { useSQLiteContext } from "expo-sqlite";
 import { Icon, MD3Theme, useTheme } from "react-native-paper";
 import { titleFontSize } from "@/assets/values";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query } from "firebase/firestore";
 import { firestore } from "@/firebaseConfig";
 import { firebaseTenantProps } from "@/assets/firebaseObjs/tenants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -112,7 +112,11 @@ export default function Dashboard() {
 	}
 
 	async function getNoOfPlots(): Promise<{ rowCount: number }> {
-		return await db.getFirstAsync('SELECT COUNT(*) AS rowCount FROM plots') ?? { rowCount: 0 }
+		// return await db.getFirstAsync('SELECT COUNT(*) AS rowCount FROM plots') ?? { rowCount: 0 }
+		const plotCollection = collection(firestore, `/users/${userId}/plots`)
+		const plotSnapShot = await getDocs(query(plotCollection))
+
+		return { rowCount: plotSnapShot.size }
 	}
 
 	async function getNoHouses(): Promise<{ totalRecords: number }> {

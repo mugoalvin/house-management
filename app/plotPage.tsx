@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
-import { ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View } from "react-native"
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View } from "react-native"
 import { ActivityIndicator, MD3Theme, Menu, Modal, Portal, Snackbar, useTheme } from "react-native-paper"
-import { collection, doc, getDoc, getDocs } from "firebase/firestore"
+import { collection, doc, getDoc, getDocs, onSnapshot } from "firebase/firestore"
 import { useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import Ionicons from "@expo/vector-icons/Ionicons"
@@ -15,10 +15,11 @@ import EditHouse from "@/component/EditHouse"
 import HouseList from "@/component/HouseList"
 import { firestore } from "@/firebaseConfig"
 import { tenantProps } from "@/assets/tenants"
+import { set } from "lodash"
 
 export interface CombinedHouseTenantData {
 	house: houseDataProps;
-	tenants: tenantProps[];
+	tenants: Partial<tenantProps>[]
 }
 
 export type houseDataProps = {
@@ -35,8 +36,8 @@ const PlotPage = () => {
 	const navigation = useNavigation()
 	const colorScheme = useColorScheme() || 'dark'
 	const plotsPageStyles = getPlotsPageStyles(colorScheme, theme)
-	const [userId, setUserId] = useState<string>()
-	const { plotId } = useLocalSearchParams()
+	const [userId, setUserId] = useState<string>('')
+	const [plotId, setPlotId] = useState<string>('')
 	const [plotData, setPlotData] = useState<plotsProps>({} as plotsProps)
 	const [housesInPlots, setHousesInPlots] = useState<Partial<houseDataProps[]>>([])
 	const [housesToDisplay, setHousesToDisplay] = useState<Partial<CombinedHouseTenantData[]>>([])
@@ -53,82 +54,105 @@ const PlotPage = () => {
 	const openMenu = () => setMenuOpen(true)
 	const closeMenu = () => setMenuOpen(false)
 
-	const getUserId = async () => {
+	const getUserIdAndPlotId = async () => {
 		await AsyncStorage.getItem('userId')
 			.then((id) => {
-				setUserId(id?.toString())
+				setUserId(id?.toString() || '')
 			})
+		await AsyncStorage.getItem('plotId')
+			.then((id) => {
+				setPlotId(id?.toString() || '')
+			})
+
+		return { userId: userId, plotId: plotId }
 	}
 
 	const getPlotData = async (plotId: string) => {
 		setPlotData((await getDoc(doc(firestore, `/users/${userId}/plots`, plotId))).data() as plotsProps)
 	}
 
-	const getTenantsInHouses = async () => {
-		try {
-			// Get all houses in the plot
-			const housesSnapshot = await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses`));
-			const housesList: Partial<houseDataProps>[] = [];
+	const getTenantsInHousesWithListeners = async (userId: string, plotId: string) => {
+	try {
+		// Houses Listener
+		const housesRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses`);
+		console.log("Listening for house changes...");
 
-			// Loop through each house and collect house data
-			for (const doc of housesSnapshot.docs) {
-				const houseData = { houseId: doc.id, ...doc.data() };
-				housesList.push(houseData)
-			}
+		onSnapshot(housesRef, (snapshot) => {
+			const housesList: houseDataProps[] = [];
+			snapshot.docs.forEach((doc) => {
+				const houseData = { houseId: doc.id, ...doc.data() } as houseDataProps;
+				housesList.push(houseData);
+			});
 
+			// Sort houses by houseNumber
 			// @ts-ignore
-			// Sort houses in ascending order based on house number
-			housesList.sort((houseA, houseB) => houseA.houseNumber?.split('')[1] - houseB.houseNumber?.split('')[1]);
-			// @ts-ignore
-			setHousesInPlots(housesList)
+			// housesList.sort((houseA, houseB) => parseInt(houseA.houseNumber?.split('')[1]) - parseInt(houseB.houseNumber?.split('')[1]))
+			housesList.sort((a, b) => {
+				const numA = parseInt(a.houseNumber.substring(1), 10)
+				const numB = parseInt(b.houseNumber.substring(1), 10)
+				return numA - numB;
+			});
+			// housesList.sort()
+			setHousesInPlots(housesList);
 
-			const combinedList: CombinedHouseTenantData[] = [];
+			// Handle house changes dynamically
+			snapshot.docChanges().forEach((change) => {
+				if (change.type === "added") {
+					console.log("House added: ", change.doc.data());
+				} else if (change.type === "modified") {
+					console.log("House modified: ", change.doc.data());
+				} else if (change.type === "removed") {
+					console.log("House removed: ", change.doc.data());
+				}
+			});
 
-			// Loop through each house to check for tenants
-			for (const house of housesList) {
-				const tenantsSnapshot = await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.houseId}/tenants`))
-				const tenantsList: Partial<tenantProps>[] = []
+			// Update tenants for each house
+			housesList.forEach((house) => {
+				const tenantsRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.houseId}/tenants`);
 
-				// Check if tenants exist and collect tenant data
-				if (!tenantsSnapshot.empty) {
-					for (const tenantDoc of tenantsSnapshot.docs) {
-						tenantsList.push({ id: tenantDoc.id, ...tenantDoc.data() })
-					}
+				onSnapshot(tenantsRef, (tenantsSnapshot) => {
+					const tenantsList: Partial<tenantProps>[] = [];
+					tenantsSnapshot.docs.forEach((tenantDoc) => {
+						tenantsList.push({ id: tenantDoc.id, ...tenantDoc.data() });
+					});
 
-					// Create CombinedHouseTenantData object
+					// Create or update the combined data
 					const combinedData: CombinedHouseTenantData = {
 						house: house as houseDataProps,
-						// @ts-ignore
 						tenants: tenantsList,
 					};
 
-					// Add to combined list
-					combinedList.push(combinedData);
-				}
-				else {
-					const combinedData: CombinedHouseTenantData = {
-						house: house as houseDataProps,
-						tenants: []
-					};
-					combinedList.push(combinedData)
-				}
-			}
-
-			// Update state with the combined list
-			setHouseTenantObjList(combinedList || housesList)
-		} catch (error) {
-			console.error("Error fetching tenants in houses:", error);
-		}
+					// Update the combinedList state dynamically
+					setHouseTenantObjList((prevList) => {
+						const updatedList = [...prevList];
+						const existingIndex = updatedList.findIndex((item) => item.house.houseId === house.houseId);
+						if (existingIndex >= 0) {
+							updatedList[existingIndex] = combinedData;
+						} else {
+							updatedList.push(combinedData);
+						}
+						return updatedList;
+					});
+				});
+			});
+		});
+	} catch (error) {
+		console.error("Error setting up house and tenant listeners:", error);
 	}
+};
 
-	useEffect(() => {
-		getUserId()
-	}, [])
+
+	useFocusEffect(
+		useCallback(() => {
+			getUserIdAndPlotId()
+		}, [])
+	)
 
 	useEffect(() => {
 		if (plotId && userId) {
 			getPlotData(plotId as string)
-			getTenantsInHouses()
+			getTenantsInHousesWithListeners(userId, plotId)
+			// getTenantsInHouses()
 		}
 	}, [plotId, userId])
 
@@ -146,7 +170,7 @@ const PlotPage = () => {
 		useCallback(() => {
 			if (plotId && userId) {
 				getPlotData(plotId as string)
-				getTenantsInHouses()
+				// getTenantsInHouses()
 			}
 		}, [])
 	)

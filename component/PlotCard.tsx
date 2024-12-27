@@ -12,7 +12,7 @@ import PlotCardText from './PlotCardText'
 
 interface plotCardProps {
 	plotObj: plotsProps
-	openModal: (action : 'add' | 'edit' | 'delete', plotId: number | string) => void
+	openModal: (action : 'add' | 'edit' | 'delete', plotId: string) => void
 }
 
 const PlotCard = ({ plotObj, openModal }: plotCardProps) => {
@@ -46,9 +46,9 @@ const PlotCard = ({ plotObj, openModal }: plotCardProps) => {
 						</Pressable>
 					}>
 					{/* <Menu.Item onPress={() => {closeMenu(); openModal('edit', plotObj.id || 0)}} title="Edit Plot Data" leadingIcon='pencil' titleStyle={plotCardStyles.titleStyle}/> */}
-					<Menu.Item onPress={() => {closeMenu(); openModal('edit', plotObj.id || '')}} title="Edit Plot Data" leadingIcon='pencil' titleStyle={plotCardStyles.titleStyle}/>
+					<Menu.Item onPress={() => {closeMenu(); openModal('edit', plotObj.id?.toString() || '')}} title="Edit Plot Data" leadingIcon='pencil' titleStyle={plotCardStyles.titleStyle}/>
 					<Divider />
-					<Menu.Item onPress={() => {closeMenu(); openModal('delete', plotObj.id || '')}} title="Delete Plot" leadingIcon='delete' titleStyle={plotCardStyles.titleStyle}/>
+					<Menu.Item onPress={() => {closeMenu(); openModal('delete', plotObj.id?.toString() || '')}} title="Delete Plot" leadingIcon='delete' titleStyle={plotCardStyles.titleStyle}/>
 				</Menu>
 			</View>
 			<View style={{ flexDirection: 'row' }}>
