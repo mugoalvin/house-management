@@ -16,6 +16,7 @@ import { collection, onSnapshot } from "firebase/firestore"
 import { firestore } from "@/firebaseConfig"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
+
 export default function Plots() {
 	const theme = useTheme()
 	const navigation = useNavigation()
@@ -24,7 +25,7 @@ export default function Plots() {
 	const [modalVisibility, setModalVisibility] = useState<boolean>(false)
 	const [modalAction, setModalAction] = useState<'add' | 'edit' | 'delete' | null>(null)
 	const [plotUpdated, setPlotUpdated] = useState<boolean>(false)
-	const [selectedPlotId, setSelectedPlotId] = useState<number | string>('')
+	const [selectedPlotId, setSelectedPlotId] = useState<string>('')
 	const [fireStorePlots, setFireStorePlots] = useState<plotsProps[] | null>(null)
 	const [snackBarMsg, setSnackBarMsg] = useState<string>('')
 
@@ -42,11 +43,12 @@ export default function Plots() {
 			})
 	}
 
-	const openPlot = (plotName: string, plotId: number | string) => {
-		router.push({ pathname: '/plotPage', params: { plotId } })
+	const openPlot = (plotId: string) => {
+		AsyncStorage.setItem('plotId', plotId?.toString())
+		router.push({ pathname: '/plotPage' })
 	}
 
-	const openPlotModal = (action: 'add' | 'edit' | 'delete', plotId: number | string) => {
+	const openPlotModal = (action: 'add' | 'edit' | 'delete', plotId: string) => {
 		setSelectedPlotId(plotId)
 		setModalAction(action)
 		setModalVisibility(true)
@@ -58,7 +60,7 @@ export default function Plots() {
 	}
 
 	useEffect(() => {
-		if(userId !== '') {
+		if (userId !== '') {
 			const unsubscribe = onSnapshot(
 				collection(firestore, `/users/${userId}/plots`), (querySnapshot) => {
 					const updatedPlots: plotsProps[] = [];
@@ -94,30 +96,30 @@ export default function Plots() {
 							<ActivityIndicator size='large' />
 						</View>
 					) :
-					<View style={getPlotStyle(colorScheme, theme).view}>
-						{
-							fireStorePlots?.length == 0 ?
-								<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: Dimensions.get('window').height * .8 }}>
-									<CustomizedText textStyling={{ textAlign: 'center', marginBottom: 20, fontFamily: 'DefaultCustomFont-Bold', fontSize: appFontSize + 5 }}>No plots available at the moment</CustomizedText>
-									<CustomizedText textStyling={{ textAlign: 'center', fontSize: appFontSize }}>
-										Click on
-										<View style={{ backgroundColor: theme.colors.primaryContainer, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderRadius: 5 }}>
-											<CustomizedText>+</CustomizedText>
-										</View> to add a now one below
-									</CustomizedText>
-								</View>
-								:
-								fireStorePlots?.map((plotData, index) => (
-									<Card key={index} onPress={() => openPlot(plotData.plotName, plotData.id || 0)}>
-										<PlotCard
-											plotObj={plotData}
-											openModal={(action, plotid) => openPlotModal(action, plotid)}
-										/>
-									</Card>
-								)
-							)
-						}
-					</View>
+						<View style={getPlotStyle(colorScheme, theme).view}>
+							{
+								fireStorePlots?.length == 0 ?
+									<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: Dimensions.get('window').height * .8 }}>
+										<CustomizedText textStyling={{ textAlign: 'center', marginBottom: 20, fontFamily: 'DefaultCustomFont-Bold', fontSize: appFontSize + 5 }}>No plots available at the moment</CustomizedText>
+										<CustomizedText textStyling={{ textAlign: 'center', fontSize: appFontSize }}>
+											Click on
+											<View style={{ backgroundColor: theme.colors.primaryContainer, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderRadius: 5 }}>
+												<CustomizedText>+</CustomizedText>
+											</View> to add a now one below
+										</CustomizedText>
+									</View>
+									:
+									fireStorePlots?.map((plotData, index) => (
+										<Card key={index} onPress={() => openPlot(plotData.id?.toString() || '')}>
+											<PlotCard
+												plotObj={plotData}
+												openModal={(action, plotid) => openPlotModal(action, plotid)}
+											/>
+										</Card>
+									)
+									)
+							}
+						</View>
 				}
 
 			</ScrollView>
@@ -144,7 +146,7 @@ export default function Plots() {
 				icon='plus'
 				style={getPlotStyle(colorScheme, theme).fab}
 				// onPress={() => openPlotModal('add', selectedPlotId)}
-				onPress={() => openPlotModal('add', 0)}
+				onPress={() => openPlotModal('add', '')}
 			/>
 		</>
 	)

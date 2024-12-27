@@ -5,6 +5,7 @@ import { Avatar, Icon, List, Menu, useTheme } from 'react-native-paper'
 import { tenantProps } from '@/assets/tenants'
 import { CombinedHouseTenantData } from '@/app/plotPage'
 import { calculateTimeDuration } from '@/assets/values'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // type houseObject = {
 // 	houseId: string
@@ -43,6 +44,11 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 	const closeMenu = () => setVisible(false)
 
 	const handleHousePress = (plotName: string, house: Partial<CombinedHouseTenantData>, plotId: string) => {
+		
+		if (house.tenants && house.tenants[0] && house.tenants[0].id) {
+			AsyncStorage.setItem('tenantId', house.tenants[0].id)
+		}
+
 		router.push({
 			pathname: '/housePage',
 			params: {
@@ -60,7 +66,7 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 				onPress={() => handleHousePress(plotName, house, plotId)}
 				onLongPress={() => { openMenu(); Vibration.vibrate(150) }}
 				title={(house.tenants ?? []).length > 0 ? `${house.tenants![0].firstName}  ${house.tenants![0].lastName}` : 'VACANT'}
-				description={house.tenants?.length !== 0 && calculateTimeDuration(new Date(house.tenants![0].moveInDate))}
+				description={house.tenants?.length !== 0 && house.tenants![0].moveInDate ? calculateTimeDuration(new Date(house.tenants![0].moveInDate)) : ''}
 				titleStyle={house.tenants?.length !== 0 ? { fontFamily: 'DefaultCustomFont-ExtraBold' } : { color: '#999', fontFamily: 'DefaultCustomFont' }}
 				descriptionStyle={{ fontFamily: 'DefaultCustomFont' }}
 				left={props => (
