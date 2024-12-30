@@ -1,5 +1,4 @@
 import { View, StyleSheet, StatusBar, useColorScheme, ScrollView, DrawerLayoutAndroid, Dimensions, Alert } from "react-native"
-import { Button } from "react-native-paper";
 import Card, { getCardStyle } from "@/component/Card";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ItemCount from "@/component/ItemCount";
@@ -17,7 +16,7 @@ import { tenantProps, tenantsColumns } from "@/assets/tenants"
 import { tableTransactionsHeadertexts } from "@/assets/transactions";
 import CustomizedText from "@/component/CustomizedText";
 import { useSQLiteContext } from "expo-sqlite";
-import { Icon, MD3Theme, useTheme } from "react-native-paper";
+import { ActivityIndicator, Icon, MD3Theme, useTheme } from "react-native-paper";
 import { titleFontSize } from "@/assets/values";
 import { collection, doc, getDoc, getDocs, query } from "firebase/firestore";
 import { firestore } from "@/firebaseConfig";
@@ -136,10 +135,13 @@ export default function Dashboard() {
 		})
 	}
 
+	const fetchNoOfPlots = async () => {
+		setNoOfPlots((await getNoOfPlots()).rowCount)
+	}
+
 	async function setData() {
 		setAllTenantsColumns(mapColumnNames(await getTenantsColumns()))
 		setTransactions(await getTransactionsData())
-		setNoOfPlots((await getNoOfPlots()).rowCount)
 		setAllTenants(await getTenants())
 		setNoOfHouses((await getNoHouses()).totalRecords)
 		setNoOfTenants((await getNoTenants()).tenantCount)
@@ -147,7 +149,15 @@ export default function Dashboard() {
 
 	useFocusEffect(
 		useCallback(() => {
-			setData()
+			// setData()
+		}, [])
+
+	)
+	useFocusEffect (
+		useCallback( () => {
+			if (userId) {
+				fetchNoOfPlots()
+			}
 		}, [])
 	)
 
@@ -166,12 +176,6 @@ export default function Dashboard() {
 
 		if (docSnap.exists()) {
 			setUserData(docSnap.data() as firebaseTenantProps)
-
-			// navigation.setOptions({
-			// 	// title: `Welcome, ${userData?.firstName}`,
-			// 	title: `Welcome, ${userId}`,
-			// 	headerTitleAlign: 'left' as const,
-			// })
 		}
 		else {
 			console.warn('No docs found!')
@@ -213,17 +217,20 @@ export default function Dashboard() {
 
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Occupancy</CustomizedText>
-						<Bar />
+						{/* <Bar /> */}
+						<CustomizedText textStyling={{textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error}}>Upcoming</CustomizedText>
 					</Card>
 
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Transactions</CustomizedText>
 						<Table tableTitles={tableTransactionsHeadertexts} tableData={transformedTransactions} />
+						<CustomizedText textStyling={{textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error}}>Upcoming</CustomizedText>
 					</Card>
 
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Tenants</CustomizedText>
 						<Table tableTitles={[{ title: 'Plot', flexBasisNo: 1 }].concat(allTenantsColumns)} tableData={allTenants} onRowPress={onTenantClick} />
+						<CustomizedText textStyling={{textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error}}>Upcoming</CustomizedText>
 					</Card>
 
 					{/* <Card onPress={() => router.push('/(tabs)/settings')}>

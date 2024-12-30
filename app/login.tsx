@@ -15,8 +15,12 @@ const Login = () => {
 	const styles = getAuthStyle(colorScheme, theme)
 	const navigation = useNavigation()
 	
-	const [email, setEmail] = useState<string>('niawai@gmail.com')
-	const [password, setPassword] = useState<string>('Asdfghjkl')
+	// const [email, setEmail] = useState<string>('niawai@gmail.com')
+	// const [password, setPassword] = useState<string>('Asdfghjkl')
+
+	const [email, setEmail] = useState<string>('')
+	const [password, setPassword] = useState<string>('')
+
 
 	const [loginButtonPressed, setLoginButtonPressed] = useState<boolean>(false)
 

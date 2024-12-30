@@ -18,13 +18,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 type addTenantProps = {
 	houseId: string
 	plotId: string
+	houseRent: number
 	closeAddTenantModal: () => void
-	onOpenSnackBar: () => void
 	setSnackbarMsg: (msg: string) => void
+	openSnackBar: () => void
 	tenantAdded: (state: boolean) => void
 }
 
-const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpenSnackBar, tenantAdded }: addTenantProps) => {
+const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackbarMsg, openSnackBar, tenantAdded }: addTenantProps) => {
 	const db = useSQLiteContext()
 	const colorScheme = useColorScheme() || 'dark'
 	const theme = useTheme()
@@ -32,11 +33,11 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 	const [pickerIsOpen, setPickerOpen] = useState<boolean>(false)
 	const maxRenderSteps = 4
 	// const initialFormData: Partial<tenantFormProps> = { firstName: '', lastName: '', contactInfo: '', moveInDate: new Date(), occupation: '', rentOwed: 0, depositOwed: 0 }
-	const initialFormData: Partial<tenantFormProps> = { firstName: '', lastName: '', contactInfo: '', moveInDate: '', occupation: '', rentOwed: 0, depositOwed: 0 }
+	const initialFormData: Partial<tenantFormProps> = { firstName: '', lastName: '', contactInfo: '', moveInDate: '', occupation: '', rentOwed: 0, depositOwed: 0}
 	const [formData, setFormData] = useState<Partial<tenantFormProps>>(initialFormData)
 	const [monthsFromMoveInDate, setMonthsFromMoveInDate] = useState<string[]>([])
 
-	const [ userId, setUserId ] = useState<string>()
+	const [userId, setUserId] = useState<string>()
 
 	const getUserId = async () => {
 		await AsyncStorage.getItem('userId')
@@ -67,53 +68,58 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 
 	const addTenantToDB = async (formData: tenantFormProps, userId: string) => {
 		let numberOccupiedHouses = 0
-		if (userId)
-		await addDoc(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants`), formData)
-			.then(() => {
-				console.log('Tenant added successfully.')
-				closeAddTenantModal()
-				setSnackbarMsg(`${formData.firstName} ${formData.lastName} added successful.`)
-				onOpenSnackBar()
-			})
-			.catch((error) => {
-				console.error(error)
-			})
-			.finally(()	=> {
-				Alert.alert('Tenant Added', 'Tenant added successfully.')
-			})
-		let plotData = {} as plotsProps
-		await getDoc(doc(firestore, `/users/${userId}/plots/${plotId}`))
-			.then((doc) => {
-				const plotDataDB = doc.data()
-				plotData = plotDataDB as plotsProps
-				numberOccupiedHouses = plotData?.numberOccupiedHouses || 0
-			}).
-			catch((error) => {
-				console.error(error)
-			})
 
-		await setDoc(doc(firestore, `/users/${userId}/plots/${plotId}`), {
-			...plotData,
-			numberOccupiedHouses: numberOccupiedHouses + 1
-		})
-		.then(() => {
-			console.log('Number of occupied houses updated.')
-			setSnackbarMsg('Number of occupied houses updated.')
-			onOpenSnackBar()
-			tenantAdded(true)
-		})
-		.catch((error) => {
-			console.error(error)
-		})
-	}
+		if (userId) {
+			await addDoc(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants`), formData)
+				.then(() => {
+					closeAddTenantModal()
+					console.log(`${formData.firstName} ${formData.lastName} added successful.`)
+					setSnackbarMsg(`${formData.firstName} ${formData.lastName} added successful.`)
+					openSnackBar()
+				})
+				.catch((error) => {
+					console.error('Error adding tenant:\n' + error)
+					setSnackbarMsg('Error adding tenant:\n' + error)
+					openSnackBar()
+				})
+			let plotData = {} as plotsProps
+			await getDoc(doc(firestore, `/users/${userId}/plots/${plotId}`))
+				.then((doc) => {
+					const plotDataDB = doc.data()
+					plotData = plotDataDB as plotsProps
+					numberOccupiedHouses = plotData?.numberOccupiedHouses || 0
+				}).
+				catch((error) => {
+					console.error(error)
+				})
 
-	const handleSubmit = async (formData: Partial<tenantFormProps>, userId: string) => {
-		await addTenantToDB(formData as tenantFormProps, userId)
+			await setDoc(doc(firestore, `/users/${userId}/plots/${plotId}`), {
+				...plotData,
+				numberOccupiedHouses: numberOccupiedHouses + 1
+			})
+				.then(() => {
+					console.log('Number of occupied houses updated.')
+					setSnackbarMsg('Number of occupied houses updated.')
+					openSnackBar()
+					tenantAdded(true)
+				})
+				.catch((error) => {
+					console.error(error)
+				})
+		}
 	}
 
 	useEffect(() => {
 		getUserId()
-	} , [])
+	}, [])
+
+	useEffect(() => {
+		setFormData(prevState => ({
+			...prevState,
+			rentOwed: monthsFromMoveInDate.length * houseRent,
+			depositOwed: houseRent
+		}))
+	}, [monthsFromMoveInDate])
 
 	const renderStep = () => {
 		switch (currentStep) {
@@ -124,7 +130,7 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 						<TextInput
 							value={formData.firstName}
 							style={getModalStyle(colorScheme, theme).textInput}
-							onChangeText={(value) => handleInputChange('firstName', value)}
+							onChangeText={(value) => handleInputChange('firstName', value.trim())}
 							mode='outlined'
 							label='First Name'
 							keyboardType='default'
@@ -132,7 +138,7 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 						<TextInput
 							value={formData.lastName}
 							style={getModalStyle(colorScheme, theme).textInput}
-							onChangeText={(value) => handleInputChange('lastName', value)}
+							onChangeText={(value) => handleInputChange('lastName', value.trim())}
 							mode='outlined'
 							label='Last Name'
 							keyboardType='default'
@@ -146,7 +152,7 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 						<TextInput
 							value={formData.contactInfo}
 							style={getModalStyle(colorScheme, theme).textInput}
-							onChangeText={(value) => handleInputChange('contactInfo', value)}
+							onChangeText={(value) => handleInputChange('contactInfo', value.trim())}
 							mode='outlined'
 							label='Phone Number'
 							keyboardType='numeric'
@@ -198,7 +204,7 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 			<View style={getModalStyle(colorScheme, theme).main}>
 				<CustomizedText textStyling={getModalStyle(colorScheme, theme).title}>New Tenant</CustomizedText>
 				{renderStep()}
-				<ModalButtons currentStep={currentStep} maxRenderSteps={maxRenderSteps} handleNext={handleNext} handleBack={handleBack} submitFormData={() => handleSubmit(formData as tenantFormProps, userId as string)} />
+				<ModalButtons currentStep={currentStep} maxRenderSteps={maxRenderSteps} handleNext={handleNext} handleBack={handleBack} submitFormData={() => addTenantToDB(formData as tenantFormProps, userId as string)} />
 			</View>
 			{
 				pickerIsOpen &&
@@ -209,37 +215,9 @@ const AddTenant = ({ houseId, plotId, closeAddTenantModal, setSnackbarMsg, onOpe
 					onChange={(event, selectedDate) => {
 						closeDatePicker()
 						handleInputChange('moveInDate', selectedDate?.toString() || "")
-						// setMonthsFromMoveInDate(getMonthsBetween(formData.moveInDate))
-
-						// @ts-ignore
-						setMonthsFromMoveInDate(getMonthsBetween(selectedDate?.toString()))
+						setMonthsFromMoveInDate(getMonthsBetween(selectedDate?.toString() || ""))
 					}}
 				/>
-
-
-				// <DateTimePicker
-				// 	mode='single'
-				// 	date={new Date()}
-				// 	onChange={(params) => {
-				// 		closeDatePicker()
-				// 		handleInputChange('moveInDate', params.date?.toString() || "")
-				// 		setMonthsFromMoveInDate(getMonthsBetween(formData.moveInDate))
-				// 		ToastAndroid.show(`Date Captured - ${params.date}`, ToastAndroid.SHORT)
-				// 	}}
-
-				// 	yearContainerStyle={{ backgroundColor: 'black' }}
-				// 	calendarTextStyle={{ color: 'white' }}
-				// 	headerTextStyle={{ color: 'white' }}
-				// 	headerButtonColor='white'
-
-				// 	dayContainerStyle={{ borderRadius: 10 }}
-				// 	weekDaysTextStyle={{ color: 'white' }}
-
-
-				// 	// timePickerContainerStyle={{backgroundColor: 'red'}}
-				// 	timePickerTextStyle={{ color: 'gray' }}
-				// 	selectedRangeBackgroundColor='purple'
-				// />
 			}
 		</>
 	)

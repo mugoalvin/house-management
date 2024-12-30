@@ -12,14 +12,18 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { transactionDBProp } from '@/assets/transactions'
 import { getMonths } from '@/assets/payment'
 import { houseProps } from '@/app/houses'
+import { collection, getDocs } from 'firebase/firestore'
+import { firestore } from '@/firebaseConfig'
+import { set } from 'lodash'
 
 
 type PlotInfoProps = {
+	userId: string
 	plotData: plotsProps
 	houses: Partial<houseDataProps[]>
 }
 
-const PlotInfo = ({ plotData, houses }: PlotInfoProps) => {
+const PlotInfo = ({userId, plotData, houses }: PlotInfoProps) => {
 	const db = useSQLiteContext()
 	const theme = useTheme()
 	const colorScheme = useColorScheme() || 'dark'
@@ -33,10 +37,32 @@ const PlotInfo = ({ plotData, houses }: PlotInfoProps) => {
 	const [tenantsInPlot, setTenantsInPlot] = useState<tenantProps[]>([])
 	const [tenantsWithPendingPayments, setTenantsWithPendingPayments] = useState<(houseDataProps & tenantProps)[]>([])
 
-	const fetchTenantsInPlots = async() => {
+	const fetchTenantsInPlots = async(userId: string, plotId: string) => {
 		try{
-			const tenants : tenantProps[] = await db.getAllAsync('SELECT tenants.* FROM tenants JOIN houses ON tenants.houseId = houses.id WHERE houses.plotId = ? ', [plotData.id || 0])
+			// ============================================SQLite============================================
+			// const tenants : tenantProps[] = await db.getAllAsync('SELECT tenants.* FROM tenants JOIN houses ON tenants.houseId = houses.id WHERE houses.plotId = ? ', [plotData.id || 0])
+			// setTenantsInPlot(tenants)
+			// =============================================================================================
+
+
+			// ============================================Firebase============================================
+			const tenants: tenantProps[] = []
+			const plotRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses`)
+			await getDocs(plotRef).then((snapshot) => {
+				snapshot.forEach((doc) => {
+					const house = {id: doc.id, ...doc.data() as houseProps}
+					const tenantRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.id}/tenants`)
+					getDocs(tenantRef).then((snapshot) => {
+						snapshot.forEach((doc) => {
+							const tenant = {...doc.data() as tenantProps, id: doc.id}
+							tenants.push(tenant)
+						})
+					})
+				})
+			})
+
 			setTenantsInPlot(tenants)
+			// =============================================================================================
 		}
 		catch(e) {
 			throw e
@@ -69,7 +95,9 @@ const PlotInfo = ({ plotData, houses }: PlotInfoProps) => {
 	}
 
 	useEffect(() => {
-		fetchTenantsInPlots()
+		if (userId && plotData.id !== undefined) {
+			fetchTenantsInPlots(userId, plotData.id as string)
+		}
 		getThisMonthTransactions()
 	}, [plotData])
 

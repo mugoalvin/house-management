@@ -2,7 +2,7 @@ import { SafeAreaView, useColorScheme } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import CustomizedText from './CustomizedText'
 import { plotsProps } from '@/assets/plots'
-import { Button, useTheme } from 'react-native-paper'
+import { ActivityIndicator, Button, useTheme } from 'react-native-paper'
 import { useSQLiteContext } from 'expo-sqlite'
 import DropDown from './DropDown'
 import { getModalStyle } from './CustomModal'
@@ -25,6 +25,7 @@ const DeletePlot = ({ plots, plotUpdated, closePlotModal, setPlotUpdated, setSna
 	const colorScheme = useColorScheme() || 'dark'
 	const [selectedPlotToDelete, setPlotToDelete] = useState<number>(0)
 	const [userId, setUserId] = useState<string>('')
+	const [loading, setLoading] = useState<boolean>(false)
 
 	const plotList = plots.map(plot => ({
 		key: plot.id,
@@ -41,27 +42,60 @@ const DeletePlot = ({ plots, plotUpdated, closePlotModal, setPlotUpdated, setSna
 			})
 	}
 
-	const deletePlot = async (plotId: number) => {
-		// -----------------------------------------------------------------------------------SQLite-----------------------------------------------------------------------------------
-		const houses: plotsProps[] = await db.getAllAsync('SELECT id FROM houses WHERE plotId = ?', [plotId])
-		houses.forEach(async house => {
-			await db.runAsync('DELETE FROM tenants WHERE houseId = ?', [house.id || -1])
-		})
-		await db.runAsync('DELETE FROM houses WHERE plotId = ?', [plotId])
-		await db.runAsync('DELETE FROM plots WHERE id = ?', [plotId])
-		// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	// const deletePlot = async () => {
+	// 	console.log('Deleting Plot: ' + selectedPlotToDelete)
+
+	// 	const plotRef = doc(firestore, `/users/${userId}/plots/${selectedPlotToDelete}`)
+	// 	await deleteDoc(plotRef)
 
 
-		// +++++++++++++++++++++++++++++++++++++++++Firestore+++++++++++++++++++++++++++++++++++++++++
-		const plotRef = doc(firestore, `/users/${userId}/plots/${selectedPlotToDelete}`)
-		// const houseDocs = await getDocs(collection(plotRef, 'houses'))
-		await deleteDoc(plotRef)
-		// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-		closePlotModal()
-		setPlotUpdated(!plotUpdated)
-		setSnackBarMsg("Plot Deleted Successfully")
-		onToggleSnackBar()
-	}
+	// 	closePlotModal()
+	// 	setPlotUpdated(!plotUpdated)
+	// 	setSnackBarMsg("Plot Deleted Successfully")
+	// 	onToggleSnackBar()
+	// }
+
+
+	const deletePlot = async () => {
+		try {
+			const plotPath = `/users/${userId}/plots/${selectedPlotToDelete}`;
+			const plotRef = doc(firestore, plotPath);
+
+			// Recursive function to delete subcollections
+			const deleteDocumentWithSubcollections = async (documentPath: string) => {
+				const docRef = doc(firestore, documentPath);
+
+				// Get all subcollections of the document
+				const subcollections = await getDocs(collection(firestore, `/users/${userId}/plots/${selectedPlotToDelete}/houses`))
+
+				for (const subcollection of subcollections.docs) {
+					const subcollectionRef = collection(firestore, subcollection.ref.path, 'houses')
+					const subcollectionDocs = await getDocs(subcollectionRef);
+
+					for (const subDoc of subcollectionDocs.docs) {
+						await deleteDocumentWithSubcollections(subDoc.ref.path);
+					}
+				}
+
+				// Delete the document
+				await deleteDoc(docRef);
+			};
+
+			// Call the recursive deletion function
+			await deleteDocumentWithSubcollections(plotPath);
+
+			// Update UI and show snackbar
+			closePlotModal();
+			setPlotUpdated(!plotUpdated);
+			setSnackBarMsg("Plot Deleted Successfully");
+			onToggleSnackBar();
+		} catch (error) {
+			console.error(error)
+			setSnackBarMsg("Failed to delete plot: " + error)
+			onToggleSnackBar()
+		}
+	};
+
 
 	useEffect(() => {
 		getUserId()
@@ -79,7 +113,7 @@ const DeletePlot = ({ plots, plotUpdated, closePlotModal, setPlotUpdated, setSna
 				search
 				searchPlaceholder='Search Plot'
 			/>
-			<Button mode='elevated' style={{ borderRadius: 10, marginTop: 20, }} onPress={() => deletePlot(selectedPlotToDelete)}>Delete</Button>
+			<Button mode='elevated' style={{ borderRadius: 10, marginTop: 20, }} onPress={() => {setLoading(true); deletePlot()}}><CustomizedText children={loading ? <ActivityIndicator /> : "Delete"} /></Button>
 		</SafeAreaView>
 	)
 }

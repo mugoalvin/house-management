@@ -111,7 +111,6 @@ export default function RootLayout() {
 								<Stack.Screen name="tenantPage" />
 								<Stack.Screen name="register" />
 								<Stack.Screen name="login"/>
-								<Stack.Screen name="zzz" />
 								<Stack.Screen name="(tabs)" />
 							</Stack>
 						</DrawerLayoutAndroid>

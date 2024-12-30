@@ -41,8 +41,7 @@ const housePage = () => {
 	const style = getHousePageStyles(theme)
 	const { houseId, plotName, house, plotid } = useLocalSearchParams()
 	const plotId = plotid as string
-	const [houseData, setHouseData] = useState<CombinedHouseTenantData>(house ? JSON.parse(house as string) : {})
-	// const [houseDataDB, setHouseDataDB] = useState<CombinedHouseTenantData>({} as CombinedHouseTenantData)
+	const houseData = house ? JSON.parse(house as string) : {}
 	const [houseDataDB, setHouseDataDB] = useState<CombinedHouseTenantData>(houseData)
 	const [modalVisibility, setModalVisibility] = useState<boolean>(false)
 	const [transactionData, setTransactionData] = useState<transactionDBProp[]>([])
@@ -189,6 +188,7 @@ const housePage = () => {
 
 		if (userId && plotId && houseId && houseDataDB.tenants.length > 0) {
 			const houseDocRef = doc(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}`)
+			const houseCollRef = collection(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}/tenants`)
 			const tenantDocRef = doc(firestore, `/users/${userId}/plots/${plotId as string}/houses/${houseId}/tenants/${houseDataDB.tenants[0].id}`)
 
 			const unsubscribeHouse = onSnapshot(houseDocRef, (doc) => {
@@ -199,6 +199,14 @@ const housePage = () => {
 						house: { ...prevData.house, ...houseData, houseId: doc.id },
 					}));
 				}
+			})
+
+			const unsubscribeHouseColl = onSnapshot(houseCollRef, (snapshot) => {
+				const tenants = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as tenantProps))
+				setHouseDataDB(prevData => ({
+					...prevData,
+					tenants: tenants
+				}))
 			})
 
 			const unsubscribeTenant = onSnapshot(tenantDocRef, (tenantDoc) => {
@@ -212,6 +220,7 @@ const housePage = () => {
 			});
 			return () => {
 				unsubscribeHouse()
+				unsubscribeHouseColl()
 				unsubscribeTenant()
 			}
 		}
@@ -267,15 +276,8 @@ const housePage = () => {
 				<View style={style.view}>
 					<>
 						<Card>
-							<ConfirmView keyHolder="User Id:" value={userId || "No User ID"} />
-							<ConfirmView keyHolder="Plot Id:" value={plotId as string || "No Plot ID"} />
-							<ConfirmView keyHolder="House Id:" value={houseDataDB.house.houseId || "No House ID"} />
-							<ConfirmView keyHolder="Tenant Id:" value={houseDataDB.house.houseId || "No Tenant ID"} />
-						</Card>
-
-						{/* <Pressable onPress={() => router.push({pathname: '/tenantPage', params: {tenantName: tenantInfo.tenantName}}) }> */}
-						<Card>
-							<Pressable>
+							{/* <Pressable> */}
+						<Pressable onPress={() => router.push('/tenantPage') }>
 								<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
 									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{houseDataDB.tenants.length != 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
 									<CustomizedText>{houseDataDB.house.houseType}</CustomizedText>
@@ -404,7 +406,8 @@ const housePage = () => {
 
 			<Portal>
 				<Modal visible={modalVisibility} onDismiss={closeModal} style={{ margin: 20 }}>
-					{modalAction == 'add' && <AddTenant houseId={houseId as string} plotId={plotId as string} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} tenantAdded={setTenantAdded} />}
+					{modalAction == 'add' && 
+					<AddTenant houseId={houseId as string} plotId={plotId as string} houseRent={houseDataDB.house.rent} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} openSnackBar={onOpenSnackBar} tenantAdded={setTenantAdded} />}
 					{modalAction == 'edit' && <EditTenant tenantId={houseDataDB.tenants[0].id || ''} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
 					{modalAction == 'delete' && houseDataDB.tenants[0]?.id && <DeleteTenant tenantInfo={houseDataDB.tenants[0] as tenantProps} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
 					{modalAction == 'payment' && <Payment userId={userId || ''} plotId={plotId} houseData={houseData} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}

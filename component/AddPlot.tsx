@@ -17,11 +17,10 @@ import { houseProps } from '@/app/houses'
 
 interface FormData {
 	plotName: string
-	numberOfHouses: number
+	numberOfHouses: number | undefined
 	houseType: string
 	rentPrice: number
 	details: string
-
 	paidHouses?: number
 	amountPaid?: number
 	numberOccupiedHouses?: number
@@ -67,15 +66,12 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 
 	const submitFormData = async () => {
 		// ++++++++++++++++++++++++++++++++++++++++Firebase Add Plot++++++++++++++++++++++++++++++++++++++++
-		// await setDoc(doc(firestore, `/users/${userId}/plots`, formData.plotName ), formData)
-		// @ts-ignore
-		// await setDoc(doc(firestore, `/users/${userId}/${collection(firestore, 'plots').doc().id}`), formData)
 		const docRef = doc(collection(firestore, `/users/${userId}/plots`))
 		await setDoc(docRef, formData)
 			.then(async () => {
 				const plotId = docRef.id
-				for (let i = 0; i < formData.numberOfHouses; i++) {
-					const houseDocRef = doc(collection(firestore, `/users/${userId}/plots/${plotId}/houses`)); // Generate a unique document ID
+				for (let i = 0; i < (formData.numberOfHouses ?? 0); i++) {
+					const houseDocRef = doc(collection(firestore, `/users/${userId}/plots/${plotId}/houses`))
 					await setDoc(houseDocRef, {
 						houseNumber: `#${i + 1}`,
 						houseType: formData.houseType,
@@ -142,8 +138,6 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 						<TextInput
 							label="Number Of Houses"
 							mode='outlined'
-							// value={formData.numberOfHouses !== undefined ? String(formData.numberOfHouses) : ''}
-							value={String(formData.numberOfHouses) || ''}
 							keyboardType='numeric'
 							onChangeText={(value) => handleInputChange('numberOfHouses', parseInt(value))}
 							style={getModalStyle(colorScheme, theme).textInput}
@@ -180,7 +174,6 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 							label="Rent Price"
 							mode='outlined'
 							keyboardType='numeric'
-							value={formData.rentPrice !== undefined ? String(formData.rentPrice) : ''}
 							style={getModalStyle(colorScheme, theme).textInput}
 							onChangeText={(value) => handleInputChange('rentPrice', parseInt(value))}
 						/>
@@ -192,7 +185,7 @@ const AddPlot = ({ plotUpdated, closeAddPlotModal, onToggleSnackBar, setSnackBar
 						<CustomizedText textStyling={getModalStyle(colorScheme, theme).step}>Step 4: Confirmation</CustomizedText>
 
 						<ConfirmView keyHolder='Plot Name' value={formData.plotName} />
-						<ConfirmView keyHolder='Number of Houses' value={formData.numberOfHouses} />
+						<ConfirmView keyHolder='Number of Houses' value={formData.numberOfHouses || 0} />
 						<ConfirmView keyHolder='House Type' value={formData.houseType} />
 						<ConfirmView keyHolder='Rent Price' value={formData.rentPrice} />
 					</View>
