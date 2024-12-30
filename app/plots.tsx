@@ -43,8 +43,8 @@ export default function Plots() {
 			})
 	}
 
-	const openPlot = (plotId: string) => {
-		AsyncStorage.setItem('plotId', plotId?.toString())
+	const openPlot = async (plotId: string) => {
+		await AsyncStorage.setItem('plotId', plotId?.toString())
 		router.push({ pathname: '/plotPage' })
 	}
 

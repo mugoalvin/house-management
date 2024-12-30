@@ -8,6 +8,10 @@ import { tenantProps } from '@/assets/tenants'
 import CustomizedText from '@/component/CustomizedText'
 import Card, { getCardStyle } from '@/component/Card'
 import { getDashboardStyle } from './dashboard'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { doc, getDoc } from 'firebase/firestore'
+import { firestore } from '@/firebaseConfig'
+import ConfirmView from '@/component/ConfirmView'
 
 const tenantPage = () => {
 	const db = useSQLiteContext()
@@ -17,36 +21,65 @@ const tenantPage = () => {
 	const cardStyle = getCardStyle(colorScheme, theme)
 	const dashboardStyles = getDashboardStyle(colorScheme, theme)
 	const tenantStyle = getTenantStyle(theme)
-	const { tenantName } = useLocalSearchParams()
+	
+	const [userId, setUserId] = useState<string>('')
+	const [plotId, setPlotId] = useState<string>('')
+	const [houseId, setHouseId] = useState<string>('')
+	const [tenantId, setTenantId] = useState<string>('')
+
+
 	const [ tenantData, setTenantData ] = useState<tenantProps>({} as tenantProps)
 
-	const getTenantInfo = async () => {
-		const tenantResults = await db.getFirstAsync('SELECT * FROM tenants WHERE tenantName = ?', [tenantName as string]) as tenantProps
-		setTenantData(tenantResults)
+	const fetchTenantIdentifiers = async () => {
+		await AsyncStorage.getItem('userId').then((value) => setUserId(value as string))
+		await AsyncStorage.getItem('plotId').then((value) => setPlotId(value as string))
+		await AsyncStorage.getItem('houseId').then((value) => setHouseId(value as string))
+		await AsyncStorage.getItem('tenantId').then((value) => setTenantId(value as string))
+	}
+	
+	const getTenantInfo = async (userId: string, plotId: string, houseId: string, tenantId: string) => {
+		const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${tenantId}`)
+		getDoc(tenantRef).then((doc) => {
+			if (doc.exists()) {
+				const data = doc.data()
+				setTenantData(data as tenantProps)
+			}
+		})
 	}
 
 	const callTenant = async (phoneNumber: string) => {
 		Linking.openURL(`tel: ${phoneNumber}`)
 	}
 
+
+	useEffect(() => {
+		fetchTenantIdentifiers()
+	}, [])
+
+	useEffect(() => {
+		if (userId !== '' && plotId !== '' && houseId !== '' && tenantId !== '')
+		getTenantInfo(userId, plotId, houseId, tenantId)
+	}, [userId, plotId, houseId, tenantId])
+
 	useEffect(() => {
 		navigation.setOptions({
-			// title: tenantData.tenantName,
+			// title: tenantData.firstName + ' ' + tenantData.lastName,
 			title: 'Profile',
 		})
 	}, [tenantData])
-
-
-	useEffect(() => {
-		getTenantInfo()
-	}, [])
 
 	return (
 		<ScrollView style={dashboardStyles.scrollView}>
 			<View style={dashboardStyles.view}>
 				<Card>
+					<ConfirmView keyHolder='User ID' value={userId} />
+					<ConfirmView keyHolder='Plot ID' value={plotId} />
+					<ConfirmView keyHolder='House ID' value={houseId} />
+					<ConfirmView keyHolder='Tenant ID' value={tenantId} />
+				</Card>
+				<Card>
 					<View style={tenantStyle.imageView}>
-						<CustomizedText textStyling={tenantStyle.tenantName}>{tenantData.tenantName}</CustomizedText>
+						<CustomizedText textStyling={tenantStyle.tenantName}>{tenantData.firstName} {tenantData.lastName}</CustomizedText>
 						<CustomizedText textStyling={tenantStyle.occupation}>{tenantData.occupation}</CustomizedText>
 					</View>
 				</Card>

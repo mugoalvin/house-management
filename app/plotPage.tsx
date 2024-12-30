@@ -16,6 +16,7 @@ import HouseList from "@/component/HouseList"
 import { firestore } from "@/firebaseConfig"
 import { tenantProps } from "@/assets/tenants"
 import { set } from "lodash"
+import ConfirmView from "@/component/ConfirmView"
 
 export interface CombinedHouseTenantData {
 	house: houseDataProps;
@@ -25,7 +26,7 @@ export interface CombinedHouseTenantData {
 export type houseDataProps = {
 	houseId: string
 	houseNumber: string
-	tenants: Partial<tenantProps[]>
+	tenants: Partial<tenantProps>[]
 	isOccupied: boolean
 	rent: number
 	houseType: string
@@ -68,14 +69,20 @@ const PlotPage = () => {
 	}
 
 	const getPlotData = async (plotId: string) => {
-		setPlotData((await getDoc(doc(firestore, `/users/${userId}/plots`, plotId))).data() as plotsProps)
+		const plotRef = doc(firestore, `/users/${userId}/plots/${plotId}`)
+		await getDoc(plotRef).then((doc) => {
+			if (doc.exists()) {
+				setPlotData({id: doc.id, ...doc.data() as plotsProps})
+			} else {
+				Alert.alert('Error', 'Plot not found')
+			}
+		})
 	}
 
 	const getTenantsInHousesWithListeners = async (userId: string, plotId: string) => {
 	try {
 		// Houses Listener
 		const housesRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses`);
-		console.log("Listening for house changes...");
 
 		onSnapshot(housesRef, (snapshot) => {
 			const housesList: houseDataProps[] = [];
@@ -96,15 +103,15 @@ const PlotPage = () => {
 			setHousesInPlots(housesList);
 
 			// Handle house changes dynamically
-			snapshot.docChanges().forEach((change) => {
-				if (change.type === "added") {
-					console.log("House added: ", change.doc.data());
-				} else if (change.type === "modified") {
-					console.log("House modified: ", change.doc.data());
-				} else if (change.type === "removed") {
-					console.log("House removed: ", change.doc.data());
-				}
-			});
+			// snapshot.docChanges().forEach((change) => {
+			// 	if (change.type === "added") {
+			// 		console.log("House added: ", change.doc.data());
+			// 	} else if (change.type === "modified") {
+			// 		console.log("House modified: ", change.doc.data());
+			// 	} else if (change.type === "removed") {
+			// 		console.log("House removed: ", change.doc.data());
+			// 	}
+			// });
 
 			// Update tenants for each house
 			housesList.forEach((house) => {
@@ -168,13 +175,9 @@ const PlotPage = () => {
 
 	useFocusEffect(
 		useCallback(() => {
-			if (plotId && userId) {
-				getPlotData(plotId as string)
-				// getTenantsInHouses()
-			}
+			getPlotData(plotId as string)
 		}, [])
 	)
-
 	return (
 		<>
 			{/* <PageHeader pageTitle={`${plotName}`} /> */}
@@ -183,7 +186,7 @@ const PlotPage = () => {
 				<View style={plotsPageStyles.view}>
 					<Card>
 						{
-							plotData !== undefined && <PlotInfo plotData={plotData} houses={housesInPlots} />
+							plotData !== {} as plotsProps && <PlotInfo userId={userId} plotData={plotData} houses={housesInPlots} />
 						}
 					</Card>
 
@@ -222,12 +225,10 @@ const PlotPage = () => {
 					<Portal>
 						<Modal
 							visible={modalVisibility}
-							// onDismiss={closeEditHouseModal}
+							onDismiss={() => setModalVisibility(false)}
 							style={plotsPageStyles.modal}
 						>
-							<EditHouse selectedHouseId={selectedHouseId || ''}
-								// closeEditHouseModal={closeEditHouseModal} 
-								setSnackBarMsg={setSnackBarMsg} onToggleSnackBar={openSnackBar} />
+							<EditHouse house={housesToDisplay.find(h => h!.house.houseId === selectedHouseId)?.house as houseDataProps} setSnackBarMsg={setSnackBarMsg} onToggleSnackBar={openSnackBar} closeEditHouseModal={() => setModalVisibility(false)} />
 						</Modal>
 					</Portal>
 

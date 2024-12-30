@@ -5,9 +5,11 @@ import { TextInput, useTheme } from 'react-native-paper'
 import CustomizedText from './CustomizedText'
 import ModalButtons from './ModalButtons'
 import { tenantFormProps, tenantProps } from '@/assets/tenants'
-import { houseDataProps } from '@/app/plotPage'
 import { useSQLiteContext } from 'expo-sqlite'
 import ConfirmView from './ConfirmView'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { firestore } from '@/firebaseConfig'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface editTenantProps {
 	tenantId: string
@@ -23,32 +25,53 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 	const maxRenderSteps = 5
 	const [currentStep, setCurrentStep] = useState<number>(1)
 	const [tenantInfo, setTenantInfo] = useState<tenantProps>()
-	const initialFormData: tenantFormProps = { id: '', firstName: '', lastName: '', contactInfo: '', moveInDate: new Date(), occupation: '', rentOwed: 0, depositOwed: 0 }
+	const initialFormData: Partial<tenantFormProps> = { firstName: '', lastName: '', contactInfo: '', moveInDate: new Date(), occupation: '', rentOwed: 0, depositOwed: 0 }
 	const [formData, setFormData] = useState(initialFormData)
 
+	const [userId, setUserId] = useState<string>('')
+	const [plotId, setPlotId] = useState<string>('')
+	const [houseId, setHouseId] = useState<string>('')
+	// const [tenantId, setTenantId] = useState<string>('')
 
-	const getTenantData = async () => {
-		// setHouseData
-		let data: tenantProps = await db.getFirstAsync('SELECT * FROM tenants WHERE id = ?', [tenantId]) || {} as tenantProps
-		setTenantInfo(data)
+	const fetchTenantIdentifiers = async () => {
+		await AsyncStorage.getItem('userId').then((value) => setUserId(value as string))
+		await AsyncStorage.getItem('plotId').then((value) => setPlotId(value as string))
+		await AsyncStorage.getItem('houseId').then((value) => setHouseId(value as string))
+		// await AsyncStorage.getItem('tenantId').then((value) => setTenantId(value as string))
+	}
 
-		setFormData({
-			id: data?.id || '',
-			// houseId: data?.houseId || '',
-			// tenantName: data?.tenantName || '',
-			firstName: data?.firstName,
-			lastName: data?.lastName,
-			contactInfo: data?.contactInfo || '',
-			moveInDate: data?.moveInDate || new Date,
-			occupation: data?.occupation || '',
-			rentOwed: data?.rentOwed || 0,
-			depositOwed: data?.depositOwed || 0
+
+	const getTenantData = async (userId: string, plotId: string, houseId: string, tenantId:string) => {
+		// let data: tenantProps = await db.getFirstAsync('SELECT * FROM tenants WHERE id = ?', [tenantId]) || {} as tenantProps
+
+		const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${tenantId}`)
+		await getDoc(tenantRef).then((doc) => {
+			if (doc.exists()) {
+				const data = doc.data()
+				setTenantInfo(data as tenantProps)
+
+				setFormData({
+					firstName: data?.firstName,
+					lastName: data?.lastName,
+					contactInfo: data?.contactInfo || '',
+					moveInDate: data?.moveInDate || new Date,
+					occupation: data?.occupation || '',
+					rentOwed: data?.rentOwed || 0,
+					depositOwed: data?.depositOwed || 0
+				})
+			}
 		})
+
 	}
 
 	useEffect(() => {
-		getTenantData()
+		fetchTenantIdentifiers()
 	}, [])
+
+	useEffect(() => {
+		if (userId !== '' && plotId !== '' && houseId !== '' && tenantId !== '')
+			getTenantData(userId, plotId, houseId, tenantId)
+	}, [userId, plotId, houseId, tenantId])
 
 	const handleInputChange = (field: keyof tenantFormProps, value: string | number | Date) => {
 		setFormData(prevState => {
@@ -71,6 +94,8 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 		closeModal()
 		try {
 			// await db.runAsync('UPDATE tenants SET tenantName = ?, contactInfo = ?, occupation = ?, depositOwed = ?, rentOwed = ? WHERE id = ?', [formData.tenantName, formData.contactInfo, formData.occupation, formData.depositOwed, formData.rentOwed, tenantId])
+			const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${tenantId}`)
+			setDoc(tenantRef, formData)
 			setSnackbarMsg('Tenant\'s data has been updated')
 			openSnackBar()
 		}
@@ -137,7 +162,7 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 					<View>
 						<CustomizedText textStyling={getModalStyle(colorScheme, theme).step}>Step 4: Amounts Owed</CustomizedText>
 						<TextInput
-							value={formData.depositOwed.toString()}
+							value={formData.depositOwed?.toString()}
 							style={getModalStyle(colorScheme, theme).textInput}
 							onChangeText={(value) => handleInputChange('depositOwed', value)}
 							mode='outlined'
@@ -146,7 +171,7 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 						/>
 
 						<TextInput
-							value={formData.rentOwed.toString()}
+							value={formData.rentOwed?.toString()}
 							style={getModalStyle(colorScheme, theme).textInput}
 							onChangeText={(value) => handleInputChange('rentOwed', value)}
 							mode='outlined'
@@ -162,10 +187,10 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 						<View>
 							<CustomizedText textStyling={getModalStyle(colorScheme, theme).step}>Step 5: Confirmation</CustomizedText>
 							<ConfirmView keyHolder='Name' value={`${formData.firstName} ${formData.lastName}`} />
-							<ConfirmView keyHolder='Phone No' value={formData.contactInfo} />
-							<ConfirmView keyHolder='Profession' value={formData.occupation} />
-							<ConfirmView keyHolder='Deposit Owed' value={formData.depositOwed} />
-							<ConfirmView keyHolder='Rent Owed' value={formData.rentOwed} />
+							<ConfirmView keyHolder='Phone No' value={formData.contactInfo || ''} />
+							<ConfirmView keyHolder='Profession' value={formData.occupation || ''} />
+							<ConfirmView keyHolder='Deposit Owed' value={formData.depositOwed || 0} />
+							<ConfirmView keyHolder='Rent Owed' value={formData.rentOwed || 0} />
 						</View>
 
 					</>
