@@ -1,4 +1,4 @@
-import {Appearance, StyleSheet, useColorScheme, View} from "react-native";
+import { StyleSheet, useColorScheme, View} from "react-native";
 import CustomizedText from "@/component/CustomizedText";
 import { MD3Theme, useTheme } from "react-native-paper";
 

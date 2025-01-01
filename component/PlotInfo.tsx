@@ -1,30 +1,27 @@
-import { View, useColorScheme, StyleSheet } from 'react-native'
 import React, { useEffect, useState } from 'react'
+import { View, useColorScheme, StyleSheet } from 'react-native'
+import { MD3Theme, useTheme } from 'react-native-paper'
+import { collection, getDocs } from 'firebase/firestore'
+
 import { appFontSize } from '@/assets/values'
 import { getCardStyle } from './Card'
 import CustomizedText from './CustomizedText'
 import { plotsProps } from '@/assets/plots'
-import { MD3Theme, useTheme } from 'react-native-paper'
 import BigBold from './BigBold'
-import { houseDataProps } from '@/app/plotPage'
+import { CombinedHouseTenantData } from '@/app/plotPage'
 import { tenantProps } from '@/assets/tenants'
-import { useSQLiteContext } from 'expo-sqlite'
 import { transactionDBProp } from '@/assets/transactions'
 import { getMonths } from '@/assets/payment'
 import { houseProps } from '@/app/houses'
-import { collection, getDocs } from 'firebase/firestore'
 import { firestore } from '@/firebaseConfig'
-import { set } from 'lodash'
-
 
 type PlotInfoProps = {
 	userId: string
 	plotData: plotsProps
-	houses: Partial<houseDataProps[]>
+	housesTenants: Partial<CombinedHouseTenantData[]>
 }
 
-const PlotInfo = ({userId, plotData, houses }: PlotInfoProps) => {
-	const db = useSQLiteContext()
+const PlotInfo = ({ userId, plotData, housesTenants }: PlotInfoProps) => {
 	const theme = useTheme()
 	const colorScheme = useColorScheme() || 'dark'
 	const plotInfoStyles = getPlotInfoStyles(colorScheme, theme)
@@ -35,42 +32,33 @@ const PlotInfo = ({userId, plotData, houses }: PlotInfoProps) => {
 	const [monthTransactions, setMonthTransactions] = useState<transactionDBProp[]>([])
 
 	const [tenantsInPlot, setTenantsInPlot] = useState<tenantProps[]>([])
-	const [tenantsWithPendingPayments, setTenantsWithPendingPayments] = useState<(houseDataProps & tenantProps)[]>([])
+	const [tenantsWithPendingPayments, setTenantsWithPendingPayments] = useState<CombinedHouseTenantData[]>([])
 
-	const fetchTenantsInPlots = async(userId: string, plotId: string) => {
-		try{
-			// ============================================SQLite============================================
-			// const tenants : tenantProps[] = await db.getAllAsync('SELECT tenants.* FROM tenants JOIN houses ON tenants.houseId = houses.id WHERE houses.plotId = ? ', [plotData.id || 0])
-			// setTenantsInPlot(tenants)
-			// =============================================================================================
-
-
-			// ============================================Firebase============================================
+	const fetchTenantsInPlots = async (userId: string, plotId: string) => {
+		try {
 			const tenants: tenantProps[] = []
 			const plotRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses`)
 			await getDocs(plotRef).then((snapshot) => {
 				snapshot.forEach((doc) => {
-					const house = {id: doc.id, ...doc.data() as houseProps}
+					const house = { id: doc.id, ...doc.data() as houseProps }
 					const tenantRef = collection(firestore, `/users/${userId}/plots/${plotId}/houses/${house.id}/tenants`)
 					getDocs(tenantRef).then((snapshot) => {
 						snapshot.forEach((doc) => {
-							const tenant = {...doc.data() as tenantProps, id: doc.id}
+							const tenant = { ...doc.data() as tenantProps, id: doc.id }
 							tenants.push(tenant)
 						})
 					})
 				})
 			})
-
 			setTenantsInPlot(tenants)
-			// =============================================================================================
 		}
-		catch(e) {
+		catch (e) {
 			throw e
 		}
 	}
 
 	const calculateTotalPending = () => {
-		const pendingAmount = tenantsInPlot.reduce((previousTotal, tenant) => previousTotal + tenant.depositOwed + tenant.rentOwed , 0)
+		const pendingAmount = tenantsInPlot.reduce((previousTotal, tenant) => previousTotal + tenant.depositOwed + tenant.rentOwed, 0)
 		setTotalToBePaid(pendingAmount)
 	}
 
@@ -80,18 +68,41 @@ const PlotInfo = ({userId, plotData, houses }: PlotInfoProps) => {
 	}
 
 	const calculateMonthlyPending = () => {
-		const monthlyPending = tenantsWithPendingPayments.reduce((prevPending, transactionTenant) => prevPending + (transactionTenant.rentOwed > transactionTenant.rent ? transactionTenant.rent : transactionTenant.rentOwed) , 0)
+		// @ts-ignore
+		const monthlyPending = tenantsWithPendingPayments.reduce((prevPending, transactionTenant) => prevPending + (transactionTenant.tenants[0]?.rentOwed > transactionTenant.house?.rent ? transactionTenant.house?.rent : transactionTenant.tenants?.[0]?.rentOwed ?? 0), 0)
 		setMonthlyPending(monthlyPending)
 	}
 
 	const getThisMonthTransactions = async () => {
-		const transactions: transactionDBProp[] = await db.getAllAsync(` SELECT transactions.* FROM transactions JOIN tenants ON transactions.tenantId = tenants.id JOIN houses ON tenants.houseId = houses.id JOIN plots ON houses.plotId = plots.id WHERE transactions.month = ? AND transactions.year = ? AND plots.id = ?`, [getMonths()[new Date().getMonth()], new Date().getFullYear(), Number(plotData?.id)])
-		setMonthTransactions(transactions)
+		const transactions: transactionDBProp[] = []
+		for (const houseData of housesTenants) {
+			if (!houseData?.tenants[0]?.id) continue
+			const transactionRef = collection(firestore, `/users/${userId}/plots/${plotData.id}/houses/${houseData?.house.houseId}/tenants/${houseData.tenants[0].id}/transactions`)
+			try {
+				const snapShot = await getDocs(transactionRef);
+				if (!snapShot.empty) {
+					snapShot.docs.forEach((doc) => {
+						transactions.push(doc.data() as transactionDBProp);
+					})
+				}
+			} catch (error) {
+				console.error("Error fetching transactions:", error);
+			}
+		}
+		setMonthTransactions(transactions.filter(transaction => transaction.month == getMonths()[new Date().getMonth()] && transaction.year == new Date().getFullYear()))
 	}
 
-	const getThisMonthTransAndTenant = async () => {
-		const tenantsPending: (houseDataProps & tenantProps)[] = await db.getAllAsync(` SELECT tenants.*, houses.* FROM tenants JOIN houses ON tenants.houseId = houses.id JOIN plots ON houses.plotId = plots.id WHERE tenants.rentOwed > 0 AND plots.id = ? `, [Number(plotData.id)])
-		setTenantsWithPendingPayments(tenantsPending)
+	const getThisMonthTransAndTenant = (housesTenants: Partial<CombinedHouseTenantData[]>) => {
+		if (!housesTenants) return
+		const filteredTenants = housesTenants.filter(
+			(houseTenant) =>
+				houseTenant?.tenants &&
+				houseTenant.tenants.length > 0 &&
+				houseTenant.tenants.some((tenant) => tenant.rentOwed && tenant.rentOwed > 0)
+		)
+
+		console.log(filteredTenants)
+		setTenantsWithPendingPayments(filteredTenants.filter((tenant): tenant is CombinedHouseTenantData => tenant !== undefined))
 	}
 
 	useEffect(() => {
@@ -107,39 +118,39 @@ const PlotInfo = ({userId, plotData, houses }: PlotInfoProps) => {
 
 	useEffect(() => {
 		monthTransactions.length > 0 && calculateTotalPaid()
-		getThisMonthTransAndTenant()
 	}, [monthTransactions])
+
+	useEffect(() => {
+		getThisMonthTransAndTenant(housesTenants)
+	}, [housesTenants, monthTransactions])
 
 
 	useEffect(() => {
 		tenantsWithPendingPayments.map(transactionTenant => {
-			transactionTenant.rentOwed > 0 && calculateMonthlyPending()
+			// @ts-ignore
+			transactionTenant.tenants[0].rentOwed > 0 && calculateMonthlyPending()
 		})
 	}, [tenantsWithPendingPayments])
-	
+
 	return (
 		<>
 			<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Plot Information</CustomizedText>
 
 			<View>
 				<CustomizedText textStyling={getPlotInfoStyles(colorScheme, theme).title}>{`${getMonths()[new Date().getMonth()]}'s Income`}</CustomizedText>
-				<BigBold children={`Ksh ${ new Intl.NumberFormat('en-US').format(paidAmount) }`} customStyle={{fontSize: theme.fonts.displaySmall.fontSize, color: theme.colors.onSurface}}/>
+				<BigBold children={`Ksh ${new Intl.NumberFormat('en-US').format(paidAmount)}`} customStyle={{ fontSize: theme.fonts.displaySmall.fontSize, color: theme.colors.onSurface }} />
 			</View>
 
 			<View style={plotInfoStyles.housesAndCash}>
 				<View style={getPlotInfoStyles(colorScheme, theme).lineContainer}>
 					<CustomizedText textStyling={getPlotInfoStyles(colorScheme, theme).title}>Monthly Pending</CustomizedText>
-					<BigBold children={`Ksh ${new Intl.NumberFormat('en-US').format(monthlyPending)}`} customStyle={{fontSize: appFontSize+5, color: monthlyPending != 0 ? theme.colors.error : theme.colors.secondary}} />
+					<BigBold children={`Ksh ${new Intl.NumberFormat('en-US').format(monthlyPending)}`} customStyle={{ fontSize: appFontSize + 5, color: monthlyPending != 0 ? theme.colors.error : theme.colors.secondary }} />
 				</View>
 
 				<View style={getPlotInfoStyles(colorScheme, theme).lineContainer}>
 					<CustomizedText textStyling={getPlotInfoStyles(colorScheme, theme).title}>Total Pending</CustomizedText>
-					<BigBold children={`Ksh ${ new Intl.NumberFormat('en-US').format(totalToBePaid) }`} customStyle={{fontSize: appFontSize+5, color: totalToBePaid != 0 ? theme.colors.error : theme.colors.secondary}}/>
+					<BigBold children={`Ksh ${new Intl.NumberFormat('en-US').format(totalToBePaid)}`} customStyle={{ fontSize: appFontSize + 5, color: totalToBePaid != 0 ? theme.colors.error : theme.colors.secondary }} />
 				</View>
-			</View>
-
-			<View>
-				{/* <CustomizedText textStyling={plotInfoStyles.plotDetails}>{plotData?.details}</CustomizedText> */}
 			</View>
 		</>
 	)

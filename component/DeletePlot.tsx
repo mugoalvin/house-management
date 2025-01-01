@@ -42,28 +42,14 @@ const DeletePlot = ({ plots, plotUpdated, closePlotModal, setPlotUpdated, setSna
 			})
 	}
 
-	// const deletePlot = async () => {
-	// 	console.log('Deleting Plot: ' + selectedPlotToDelete)
-
-	// 	const plotRef = doc(firestore, `/users/${userId}/plots/${selectedPlotToDelete}`)
-	// 	await deleteDoc(plotRef)
-
-
-	// 	closePlotModal()
-	// 	setPlotUpdated(!plotUpdated)
-	// 	setSnackBarMsg("Plot Deleted Successfully")
-	// 	onToggleSnackBar()
-	// }
-
 
 	const deletePlot = async () => {
 		try {
-			const plotPath = `/users/${userId}/plots/${selectedPlotToDelete}`;
-			const plotRef = doc(firestore, plotPath);
+			const plotPath = `/users/${userId}/plots/${selectedPlotToDelete}`
 
 			// Recursive function to delete subcollections
 			const deleteDocumentWithSubcollections = async (documentPath: string) => {
-				const docRef = doc(firestore, documentPath);
+				const docRef = doc(firestore, documentPath)
 
 				// Get all subcollections of the document
 				const subcollections = await getDocs(collection(firestore, `/users/${userId}/plots/${selectedPlotToDelete}/houses`))
@@ -73,22 +59,16 @@ const DeletePlot = ({ plots, plotUpdated, closePlotModal, setPlotUpdated, setSna
 					const subcollectionDocs = await getDocs(subcollectionRef);
 
 					for (const subDoc of subcollectionDocs.docs) {
-						await deleteDocumentWithSubcollections(subDoc.ref.path);
+						await deleteDocumentWithSubcollections(subDoc.ref.path)
 					}
 				}
-
-				// Delete the document
-				await deleteDoc(docRef);
-			};
-
-			// Call the recursive deletion function
-			await deleteDocumentWithSubcollections(plotPath);
-
-			// Update UI and show snackbar
-			closePlotModal();
-			setPlotUpdated(!plotUpdated);
-			setSnackBarMsg("Plot Deleted Successfully");
-			onToggleSnackBar();
+				await deleteDoc(docRef)
+			}
+			await deleteDocumentWithSubcollections(plotPath)
+			closePlotModal()
+			setPlotUpdated(!plotUpdated)
+			setSnackBarMsg("Plot Deleted Successfully")
+			onToggleSnackBar()
 		} catch (error) {
 			console.error(error)
 			setSnackBarMsg("Failed to delete plot: " + error)

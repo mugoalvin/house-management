@@ -8,9 +8,6 @@ export const tableTransactionsHeadertexts : TableHeaderCellProps[] = [
 	{ title: 'Date', flexBasisNo: 20 }
 ]
 
-
-
-
 export const allTransactionsData = [
     { name: 'Jane Doe', houseNo: '#2', price: 3000, balance: 2000,  date: '01/01/2024' },
     { name: 'John Smith', houseNo: '#3', price: 3000, balance: 2000,  date: '02/01/2024' },
@@ -29,8 +26,9 @@ export const allTransactionsData = [
 
 
 export interface transactionDBProp {
-    id: string
+    // id: string
     amount: number
     month: string
+    transactionDate: string
     year: number
 }

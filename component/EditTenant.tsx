@@ -76,9 +76,6 @@ const EditTenant = ({ tenantId, openSnackBar, closeModal, setSnackbarMsg }: edit
 	const handleInputChange = (field: keyof tenantFormProps, value: string | number | Date) => {
 		setFormData(prevState => {
 			const updatedForm = { ...prevState, [field]: value }
-			// if (field === 'firstName' || field === 'lastName') {
-			// 	updatedForm.tenantName = `${updatedForm.firstName.trim()} ${updatedForm.lastName.trim()}`
-			// }
 			return updatedForm
 		})
 	}

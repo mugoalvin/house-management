@@ -6,8 +6,7 @@ import Bar from "@/component/Bar";
 import Table from "@/component/Table";
 import { Link, router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
 
-import * as Notifications from 'expo-notifications';
-
+import * as Notifications from 'expo-notifications'
 
 // Tenants Information
 import { tenantProps, tenantsColumns } from "@/assets/tenants"
@@ -22,6 +21,7 @@ import { collection, doc, getDoc, getDocs, query } from "firebase/firestore";
 import { firestore } from "@/firebaseConfig";
 import { firebaseTenantProps } from "@/assets/firebaseObjs/tenants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { set } from "lodash";
 
 export default function Dashboard() {
 	const db = useSQLiteContext()
@@ -30,8 +30,8 @@ export default function Dashboard() {
 	const colorScheme = useColorScheme() || 'dark'
 	const dashboardStyle = getDashboardStyle(colorScheme, theme)
 
-	const [ userId, setUserId ] = useState<string>()
-	
+	const [userId, setUserId] = useState<string>()
+
 	const [allTenants, setAllTenants] = useState<tenantProps[]>([])
 	const [allTenantsColumns, setAllTenantsColumns] = useState<any[]>([])
 	const [transactions, setTransactions] = useState<any[]>([])
@@ -56,10 +56,8 @@ export default function Dashboard() {
 	}
 
 	const getUserId = async () => {
-		await AsyncStorage.getItem('userId')
-			.then((id) => {
-				setUserId(id?.toString())
-			})
+		const id = await AsyncStorage.getItem('userId')
+		setUserId(id as string)
 	}
 
 	const mapColumnNames = (rawColumns: Array<{ name: string }>) => {
@@ -86,7 +84,7 @@ export default function Dashboard() {
 			LEFT JOIN houses ON tenants.houseId = houses.id 
 			LEFT JOIN plots ON houses.plotId = plots.id
 		`)
-		
+
 		tenants.forEach(tenant => {
 			// @ts-ignore
 			tenant.moveInDate = new Date(tenant.moveInDate).toDateString()
@@ -110,12 +108,14 @@ export default function Dashboard() {
 		return await db.getAllAsync('SELECT * FROM transactions JOIN tenants ON transactions.tenantId = tenants.id JOIN houses ON tenants.houseId = houses.id ORDER BY transactions.id DESC LIMIT 5')
 	}
 
-	async function getNoOfPlots(): Promise<{ rowCount: number }> {
+	// async function getNoOfPlots(): Promise<{ rowCount: number }> {
+	async function getNoOfPlots(userId: string) {
 		// return await db.getFirstAsync('SELECT COUNT(*) AS rowCount FROM plots') ?? { rowCount: 0 }
 		const plotCollection = collection(firestore, `/users/${userId}/plots`)
 		const plotSnapShot = await getDocs(query(plotCollection))
+		setNoOfPlots(plotSnapShot.size)
 
-		return { rowCount: plotSnapShot.size }
+		// return { rowCount: plotSnapShot.size }
 	}
 
 	async function getNoHouses(): Promise<{ totalRecords: number }> {
@@ -136,7 +136,7 @@ export default function Dashboard() {
 	}
 
 	const fetchNoOfPlots = async () => {
-		setNoOfPlots((await getNoOfPlots()).rowCount)
+		// setNoOfPlots((await getNoOfPlots()).rowCount)
 	}
 
 	async function setData() {
@@ -147,30 +147,7 @@ export default function Dashboard() {
 		setNoOfTenants((await getNoTenants()).tenantCount)
 	}
 
-	useFocusEffect(
-		useCallback(() => {
-			// setData()
-		}, [])
-
-	)
-	useFocusEffect (
-		useCallback( () => {
-			if (userId) {
-				fetchNoOfPlots()
-			}
-		}, [])
-	)
-
-	useEffect(() => {
-		navigation.setOptions({
-			title: 'Dashboard',
-			headerShown: true,
-		})
-
-		getUserId()
-	}, [])
-
-	const getUserData = async(userId: string) => {
+	const getUserData = async (userId: string) => {
 		const docRef = doc(firestore, 'users', userId)
 		const docSnap = await getDoc(docRef)
 
@@ -182,10 +159,6 @@ export default function Dashboard() {
 		}
 	}
 
-	useEffect(() => {
-		getUserData(userId as string)
-	}, [userId])
-
 	const transformedTransactions = transactions.map(transaction => ({
 		name: transaction.tenantName,
 		houseNo: transaction.houseNumber,
@@ -193,6 +166,30 @@ export default function Dashboard() {
 		balance: transaction.rentOwed + transaction.depositOwed,
 		date: new Date(transaction.transactionDate).toDateString()
 	}))
+
+	useFocusEffect(
+		useCallback(() => {
+			const fetchData = async () => {
+				await getUserId()
+			}
+			fetchData()
+		}, [])
+	);
+
+
+	useEffect(() => {
+		navigation.setOptions({
+			title: 'Dashboard',
+			headerShown: true,
+		})
+	}, [])
+
+	useEffect(() => {
+		if (userId) {
+			getNoOfPlots(userId as string)
+			getUserData(userId as string)
+		}
+	}, [userId])
 
 	return (
 		<>
@@ -218,19 +215,19 @@ export default function Dashboard() {
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Occupancy</CustomizedText>
 						{/* <Bar /> */}
-						<CustomizedText textStyling={{textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error}}>Upcoming</CustomizedText>
+						<CustomizedText textStyling={{ textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error }}>Upcoming</CustomizedText>
 					</Card>
 
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Transactions</CustomizedText>
 						<Table tableTitles={tableTransactionsHeadertexts} tableData={transformedTransactions} />
-						<CustomizedText textStyling={{textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error}}>Upcoming</CustomizedText>
+						<CustomizedText textStyling={{ textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error }}>Upcoming</CustomizedText>
 					</Card>
 
 					<Card>
 						<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>Tenants</CustomizedText>
 						<Table tableTitles={[{ title: 'Plot', flexBasisNo: 1 }].concat(allTenantsColumns)} tableData={allTenants} onRowPress={onTenantClick} />
-						<CustomizedText textStyling={{textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error}}>Upcoming</CustomizedText>
+						<CustomizedText textStyling={{ textAlign: 'center', paddingVertical: 10, fontSize: theme.fonts.labelLarge.fontSize, color: theme.colors.error }}>Upcoming</CustomizedText>
 					</Card>
 
 					{/* <Card onPress={() => router.push('/(tabs)/settings')}>

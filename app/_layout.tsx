@@ -124,7 +124,7 @@ export function Fallback() {
 	return (
 		<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
 			<ActivityIndicator />
-			<Text>App Loading</Text>
+			<Text style={{fontSize: 30, fontWeight: "bold"}}>Configuring New Months Payments</Text>
 		</View>
 	)
 }
