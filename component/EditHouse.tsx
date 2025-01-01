@@ -1,8 +1,7 @@
-import { Appearance, SafeAreaView, View, useColorScheme, } from 'react-native'
+import { SafeAreaView, View, useColorScheme, } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import CustomizedText from './CustomizedText'
 import { TextInput, useTheme } from 'react-native-paper'
-import { useSQLiteContext } from 'expo-sqlite'
 import { houseProps } from '@/app/houses'
 import DropDown from './DropDown'
 import ConfirmView from './ConfirmView'
@@ -37,7 +36,6 @@ const EditHouse = ({ house, onToggleSnackBar, setSnackBarMsg, closeEditHouseModa
 	const fetchTenantIdentifiers = async () => {
 		const userId = await AsyncStorage.getItem('userId')
 		const plotId = await AsyncStorage.getItem('plotId')
-		// const houseId = await AsyncStorage.getItem('houseId')
 		const houseId = house.houseId
 		const tenantId = await AsyncStorage.getItem('tenantId')
 
@@ -53,7 +51,7 @@ const EditHouse = ({ house, onToggleSnackBar, setSnackBarMsg, closeEditHouseModa
 		rent: house.rent,
 	})
 
-	const handleInputChange = (field: keyof houseProps, value: string | number) => {
+	const handleInputChange = (field: keyof houseDataProps, value: string | number) => {
 		setFormData({ ...formData, [field]: value })
 	}
 
@@ -72,7 +70,6 @@ const EditHouse = ({ house, onToggleSnackBar, setSnackBarMsg, closeEditHouseModa
 			await getDoc(houseRef).then((doc) => {
 				if (doc.exists()) {
 					const data = doc.data() as houseDataProps
-					console.log(data)
 					setCurrentHouseData(data)
 				}
 			})
@@ -85,10 +82,6 @@ const EditHouse = ({ house, onToggleSnackBar, setSnackBarMsg, closeEditHouseModa
 			await fetchTenantIdentifiers()
 		})()
 	}, [])
-
-	useEffect(() => {
-		console.log(house)
-	}, [house])
 
 	useEffect(() => {
 		if (userId && plotId && houseId && tenantId) {
@@ -149,7 +142,7 @@ const EditHouse = ({ house, onToggleSnackBar, setSnackBarMsg, closeEditHouseModa
 						/>
 						<DropDown
 							data={houseTypeDropdownData}
-							onSelect={(value) => handleInputChange('type', updateHouseType(value) ?? '')}
+							onSelect={(value) => handleInputChange('houseType', updateHouseType(value) ?? '')}
 							placeholder={formData.houseType}
 							notFoundText='No such house type!'
 							search={false}

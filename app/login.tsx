@@ -7,6 +7,7 @@ import { getHousePageStyles } from './housePage';
 import { firebaseAuth } from '@/firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { set } from 'lodash';
 
 const Login = () => {
 	const auth = firebaseAuth
@@ -47,12 +48,15 @@ const Login = () => {
 		signInWithEmailAndPassword(firebaseAuth, email, password)
 			.then( async (userCred) => {
 				await AsyncStorage.setItem('userId', userCred.user.uid)
-				router.push({
-					pathname: '/dashboard',
-				})
+					.then(() => {
+						router.push({
+							pathname: '/dashboard',
+						})
+					})
 			})
 			.catch((error) => {
-				console.error('Failed to sign in: ' + error)
+				setSnackbarMsg('Failed to sign in: ' + error)
+				setSnackBarVisibility(true)
 			})
 			.finally(() => {
 				setLoginButtonPressed(false)

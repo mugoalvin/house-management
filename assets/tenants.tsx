@@ -1,14 +1,3 @@
-// export type  tenantProps = {
-//     id: number | string
-//     houseId: number
-//     tenantName: string
-//     contactInfo: string
-//     moveInDate: Date
-//     occupation: string
-//     rentOwed: number
-//     depositOwed: number
-// }
-
 export type  tenantProps = {
     id: string
     firstName: string

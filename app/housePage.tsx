@@ -168,7 +168,7 @@ const housePage = () => {
 
 	useEffect(() => {
 		navigation.setOptions({
-			title: plotName + ' - House ' + houseDataDB.house.houseId,
+			title: plotName + ' - House ' + houseDataDB.house.houseNumber,
 		})
 		getUserId()
 	}, [])
