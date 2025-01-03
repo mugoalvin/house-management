@@ -14,7 +14,7 @@ export type houseProps = {
 	rent: number
 }
 
-const houses = () => {
+const Houses = () => {
 	const colorScheme = useColorScheme() || 'dark'
 	const theme = useTheme()
 	const plotsPageStyles = getPlotsPageStyles(colorScheme, theme)
@@ -27,7 +27,7 @@ const houses = () => {
 	)
 }
 
-export default houses
+export default Houses
 
 
 const getPlotsPageStyles = (colorScheme: string, theme: MD3Theme) => StyleSheet.create({

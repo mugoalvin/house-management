@@ -7,10 +7,26 @@ import { DrawerLayoutAndroid, Pressable, useColorScheme, View } from "react-nati
 import { Colors } from "@/constants/Colors";
 import DrawerDash from "@/component/DrawerDash"
 import { useFonts } from "expo-font";
+import Fallback from "./fallback";
+import Dashboard from "./dashboard";
+
+
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import Index from "./index";
+import Plots from "./plots";
+import Houses from "./houses";
+import TenantPage from "./tenantPage";
+import Register from "./register";
+import Login from "./login";
+import PlotPage from "./plotPage";
+import HousePage from "./housePage";
+import Tenants from "./tenants";
 
 export default function RootLayout() {
-	const colorScheme = useColorScheme() || 'dark'
 	const drawer = useRef<DrawerLayoutAndroid>(null)
+	const Drawer = createDrawerNavigator()
+	const colorScheme = useColorScheme() || 'dark'
+
 
 	const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
 	const [drawerPosition, setDrawerPosition] = useState<'left' | 'right'>('left')
@@ -117,14 +133,27 @@ export default function RootLayout() {
 					</PaperProvider>
 				</SQLiteProvider>
 			</React.Suspense>
-		)
-}
 
-export function Fallback() {
-	return (
-		<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-			<ActivityIndicator />
-			<Text style={{fontSize: 30, fontWeight: "bold"}}>Configuring New Months Payments</Text>
-		</View>
-	)
+
+			// <React.Suspense fallback={<Fallback />}>
+			// 	<SQLiteProvider databaseName={"rentals.db"} useSuspense>
+
+			// 		<PaperProvider theme={theme} key={1}>
+			// 			{/* <Drawer.Navigator drawerContent={props => <DrawerDash changeDrawerPosition={changeDrawerPosition} toggleDrawer={toggleDrawer} />}> */}
+			// 			<Drawer.Navigator backBehavior="history" initialRouteName="index">
+			// 				<Drawer.Screen name="index" component={Index} options={{ headerShown: false }} />
+			// 				<Drawer.Screen name="login" component={Login} />
+			// 				<Drawer.Screen name="register" component={Register} />
+			// 				<Drawer.Screen name="dashboard" component={Dashboard} />
+			// 				<Drawer.Screen name="plots" component={Plots} />
+			// 				<Drawer.Screen name="plotPage" component={PlotPage} />
+			// 				<Drawer.Screen name="housePage" component={HousePage} />
+			// 				<Drawer.Screen name="houses" component={Houses} />
+			// 				<Drawer.Screen name="tenant" component={Tenants} />
+			// 				<Drawer.Screen name="tenantPage" component={TenantPage} />
+			// 			</Drawer.Navigator>
+			// 		</PaperProvider>
+			// 	</SQLiteProvider>
+			// </React.Suspense>
+		)
 }

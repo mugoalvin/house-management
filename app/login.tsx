@@ -1,13 +1,15 @@
-import CustomizedText from '@/component/CustomizedText';
-import { router, useNavigation } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, useColorScheme, StatusBar } from 'react-native';
-import { ActivityIndicator, Button, MD3Theme, Snackbar, useTheme } from 'react-native-paper';
-import { getHousePageStyles } from './housePage';
-import { firebaseAuth } from '@/firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { set } from 'lodash';
+import React, { useEffect, useState } from 'react'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, useColorScheme, StatusBar } from 'react-native'
+import { ActivityIndicator, MD3Theme, Snackbar, useTheme } from 'react-native-paper'
+import { router, useNavigation } from 'expo-router'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+import CustomizedText from '@/component/CustomizedText'
+import { getHousePageStyles } from './housePage'
+import { firebaseAuth, firestore } from '@/firebaseConfig'
+import { getDocs, collection, doc, updateDoc, getDoc } from 'firebase/firestore'
+import { FirebaseError } from 'firebase/app'
 
 const Login = () => {
 	const auth = firebaseAuth
@@ -15,20 +17,25 @@ const Login = () => {
 	const colorScheme = useColorScheme() || 'light'
 	const styles = getAuthStyle(colorScheme, theme)
 	const navigation = useNavigation()
-	
+
 	// const [email, setEmail] = useState<string>('niawai@gmail.com')
 	// const [password, setPassword] = useState<string>('Asdfghjkl')
 
 	const [email, setEmail] = useState<string>('')
 	const [password, setPassword] = useState<string>('')
 
-
 	const [loginButtonPressed, setLoginButtonPressed] = useState<boolean>(false)
+
 
 	const [snackbarMsg, setSnackbarMsg] = useState<string>()
 	const [snackBarVisibility, setSnackBarVisibility] = useState(false)
-	const onOpenSnackBar = () => setSnackBarVisibility(true)
-	const onDismissSnackBar = () => setSnackBarVisibility(false)
+	const openSnackBar = () => setSnackBarVisibility(true)
+	const dismissSnackBar = () => setSnackBarVisibility(false)
+
+
+	const [snackBarUpdateVisibility, setSnackBarBarUpdateVisibility] = useState(false)
+	const openUpdateSnackBar = () => setSnackBarBarUpdateVisibility(true)
+	const dismissUpdateSnackBar = () => setSnackBarBarUpdateVisibility(false)
 
 	const openRegister = () => {
 		router.push({
@@ -36,26 +43,92 @@ const Login = () => {
 		})
 	}
 
-	const handleLogin = () => {
-		setLoginButtonPressed(true)
-		if(email == undefined || password == undefined) {
+	const getFriendlyErrorMessage = (error: FirebaseError): string => {
+		switch (error.code) {
+			case "auth/invalid-email":
+				return "Please enter a valid email address."
+			case "auth/invalid-credential":
+				return "invalid-credential."
+			case "auth/user-disabled":
+				return "This account has been disabled. Please contact support."
+			case "auth/user-not-found":
+				return "No account found with this email. Please sign up."
+			case "auth/wrong-password":
+				return "Incorrect password. Please try again."
+			case "auth/email-already-in-use":
+				return "This email is already in use. Please use a different email."
+			case "auth/weak-password":
+				return "Your password is too weak. Please use a stronger password."
+			default:
+				return "An unexpected error occurred. Please try again."
+		}
+	};
+
+	const updatePaidHousesAndRentOwed = async (userId: string) => {
+		try {
+			const plotsSnapshot = await getDocs(collection(firestore, `/users/${userId}/plots`));
+			const plots = plotsSnapshot.docs.map(doc => doc.id)
+
+			for (const plotId of plots) {
+				const plotRef = doc(firestore, `/users/${userId}/plots/${plotId}`)
+				await updateDoc(plotRef, { paidHouses: 0 })
+
+				const housesSnapshot = await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses`));
+				const houses = housesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+
+				for (const house of houses) {
+					const houseId = house.id  // @ts-ignore
+					const houseRent = house.rent
+
+					const tenantsSnapshot = await getDocs(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants`));
+					const tenants = tenantsSnapshot.docs.map(doc => doc.id);
+
+					for (const tenantId of tenants) {
+						const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${tenantId}`)
+						const tenantDoc = await getDoc(tenantRef)
+						if (tenantDoc.exists()) {
+							await updateDoc(tenantRef, { rentOwed: houseRent + tenantDoc.data().rentOwed })
+						}
+					}
+				}
+			}
+			console.log('Successfully updated paidHouses to 0 and rentOwed for all tenants.')
+		} catch (error) {
+			console.error('Error updating paidHouses and rentOwed:', error)
+		}
+	}
+	const handleLogin = async () => {
+		setLoginButtonPressed(true);
+
+		if (email === undefined || password === undefined) {
 			setSnackbarMsg('Fill in both Input Fields')
-			setSnackBarVisibility(true)
-			setLoginButtonPressed(false)
-			return
+			setSnackBarVisibility(true);
+			setLoginButtonPressed(false);
+			return;
 		}
 
-		signInWithEmailAndPassword(firebaseAuth, email, password)
-			.then( async (userCred) => {
-				await AsyncStorage.setItem('userId', userCred.user.uid)
-					.then(() => {
-						router.push({
-							pathname: '/dashboard',
-						})
-					})
+		await signInWithEmailAndPassword(firebaseAuth, email, password)
+			.then(async (userCred) => {
+				const userId = userCred.user.uid
+				const today = new Date()
+				const currentDate = today.getDate()
+				const currentMonth = today.getMonth()
+				const lastRunDate = await AsyncStorage.getItem('lastRunDate')
+
+				if (currentDate === 1 && (!lastRunDate || lastRunDate !== `${currentMonth}-1`)) {
+					openUpdateSnackBar()
+					await updatePaidHousesAndRentOwed(userId)
+					await AsyncStorage.setItem('lastRunDate', `${currentMonth}-1`)
+					dismissUpdateSnackBar()
+				}
+
+				await AsyncStorage.setItem('userId', userId)
+				router.push({
+					pathname: '/dashboard',
+				});
 			})
 			.catch((error) => {
-				setSnackbarMsg('Failed to sign in: ' + error)
+				setSnackbarMsg(getFriendlyErrorMessage(error))
 				setSnackBarVisibility(true)
 			})
 			.finally(() => {
@@ -63,11 +136,11 @@ const Login = () => {
 			})
 	}
 
+
 	useEffect(() => {
 		navigation.setOptions({
 			headerShown: false
 		})
-
 		const unsubscribe = auth.onAuthStateChanged(user => {
 			if (user) {
 				router.push('/dashboard')
@@ -123,7 +196,7 @@ const Login = () => {
 				<CustomizedText textStyling={styles.orText}>OR</CustomizedText>
 
 				{/* Google Login Button */}
-				<TouchableOpacity style={styles.googleButton} onPress={() => {setSnackbarMsg('Still Under Development'); onOpenSnackBar()} }>
+				<TouchableOpacity style={styles.googleButton} onPress={() => { setSnackbarMsg('Still Under Development'); openSnackBar() }}>
 					<Image
 						source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2991/2991148.png' }} // Google Icon
 						style={styles.googleIcon}
@@ -139,10 +212,16 @@ const Login = () => {
 					</TouchableOpacity>
 				</View>
 			</View>
-			<Snackbar visible={snackBarVisibility} onDismiss={onDismissSnackBar} style={getHousePageStyles(theme).snackBar} children={<Text style={{fontFamily: 'DefaultCustomFont'}} children={snackbarMsg} />} duration={Snackbar.DURATION_SHORT} />
+
+			<Snackbar visible={snackBarVisibility} onDismiss={dismissSnackBar} style={getHousePageStyles(theme).snackBar} children={<Text style={{ fontFamily: 'DefaultCustomFont' }} children={snackbarMsg} />} duration={Snackbar.DURATION_SHORT} />
+
+			<Snackbar visible={snackBarUpdateVisibility} onDismiss={dismissUpdateSnackBar} style={getHousePageStyles(theme).snackBar} duration={Snackbar.DURATION_SHORT}>
+				<Text style={{ fontFamily: 'DefaultCustomFont', fontSize: theme.fonts.bodyMedium.fontSize }}>Updating New Months Rents...</Text>
+				<Text style={{ fontFamily: 'DefaultCustomFont', fontSize: theme.fonts.bodySmall.fontSize }}>This may take a while</Text>
+			</Snackbar>
 		</>
-	);
-};
+	)
+}
 
 export const getAuthStyle = (colorScheme: string, theme: MD3Theme) => StyleSheet.create({
 	container: {
@@ -195,11 +274,13 @@ export const getAuthStyle = (colorScheme: string, theme: MD3Theme) => StyleSheet
 	},
 	loginText: {
 		fontSize: 18,
-		fontFamily: 'DefaultCustomFont-Bold'
+		fontFamily: 'DefaultCustomFont-Bold',
+		color: colorScheme == 'light' ? theme.colors.onPrimary : theme.colors.onPrimaryContainer
 	},
 	orText: {
 		marginVertical: 20,
-		fontSize: 16,
+		// fontSize: 16,
+		fontSize: theme.fonts.bodyMedium.fontSize,
 		color: '#777',
 	},
 	googleButton: {

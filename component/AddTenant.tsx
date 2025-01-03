@@ -73,7 +73,6 @@ const AddTenant = ({ houseId, plotId, houseRent, closeAddTenantModal, setSnackba
 			await addDoc(collection(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants`), formData)
 				.then(() => {
 					closeAddTenantModal()
-					console.log(`${formData.firstName} ${formData.lastName} added successful.`)
 					setSnackbarMsg(`${formData.firstName} ${formData.lastName} added successful.`)
 					openSnackBar()
 				})
