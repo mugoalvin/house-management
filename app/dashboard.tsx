@@ -1,27 +1,19 @@
-import { View, StyleSheet, StatusBar, useColorScheme, ScrollView, DrawerLayoutAndroid, Dimensions, Alert } from "react-native"
-import Card, { getCardStyle } from "@/component/Card";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import ItemCount from "@/component/ItemCount";
-import Bar from "@/component/Bar";
-import Table from "@/component/Table";
-import { Link, router, useFocusEffect, useLocalSearchParams, useNavigation } from "expo-router";
-
-import * as Notifications from 'expo-notifications'
-
-// Tenants Information
+import { View, StyleSheet, StatusBar, useColorScheme, ScrollView, DrawerLayoutAndroid } from "react-native"
+import Card, { getCardStyle } from "@/component/Card"
+import React, { useCallback, useEffect, useRef, useState } from "react"
+import ItemCount from "@/component/ItemCount"
+import Table from "@/component/Table"
+import { router, useFocusEffect, useNavigation } from "expo-router"
 import { tenantProps, tenantsColumns } from "@/assets/tenants"
-
-// Transactions Information
-import { tableTransactionsHeadertexts } from "@/assets/transactions";
-import CustomizedText from "@/component/CustomizedText";
-import { useSQLiteContext } from "expo-sqlite";
-import { ActivityIndicator, Icon, MD3Theme, useTheme } from "react-native-paper";
-import { titleFontSize } from "@/assets/values";
-import { collection, doc, getDoc, getDocs, query } from "firebase/firestore";
-import { firestore } from "@/firebaseConfig";
-import { firebaseTenantProps } from "@/assets/firebaseObjs/tenants";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { set } from "lodash";
+import { tableTransactionsHeadertexts } from "@/assets/transactions"
+import CustomizedText from "@/component/CustomizedText"
+import { useSQLiteContext } from "expo-sqlite"
+import { MD3Theme, useTheme } from "react-native-paper"
+import { collection, doc, getDoc, getDocs, query } from "firebase/firestore"
+import { firebaseAuth, firestore } from "@/firebaseConfig"
+import { firebaseTenantProps } from "@/assets/firebaseObjs/tenants"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import { signOut } from "firebase/auth"
 
 export default function Dashboard() {
 	const db = useSQLiteContext()
@@ -57,7 +49,12 @@ export default function Dashboard() {
 
 	const getUserId = async () => {
 		const id = await AsyncStorage.getItem('userId')
-		setUserId(id as string)
+		if (id) {
+			setUserId(id as string)
+		} else {
+			signOut(firebaseAuth)
+			console.error('User ID not found in AsyncStorage')
+		}
 	}
 
 	const mapColumnNames = (rawColumns: Array<{ name: string }>) => {
@@ -185,10 +182,10 @@ export default function Dashboard() {
 	}, [])
 
 	useEffect(() => {
-		if (userId) {
+		// if (userId) {
 			getNoOfPlots(userId as string)
 			getUserData(userId as string)
-		}
+		// }
 	}, [userId])
 
 	return (

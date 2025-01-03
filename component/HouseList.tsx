@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { Pressable, Vibration } from 'react-native'
-import { router } from 'expo-router'
+import { router, useNavigation } from 'expo-router'
 import { Avatar, Icon, List, Menu, useTheme } from 'react-native-paper'
 import { CombinedHouseTenantData } from '@/app/plotPage'
 import { calculateTimeDuration } from '@/assets/values'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import CustomizedText from './CustomizedText'
+
+// import {  } from 'react-navigation'
 
 type HouseInListProps = {
 	plotId: string
@@ -19,13 +21,15 @@ type HouseInListProps = {
 const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHouseId }: HouseInListProps) => {
 	const theme = useTheme()
 
+	const navigation = useNavigation()
+
 	const [visible, setVisible] = useState(false)
 	const openMenu = () => setVisible(true)
 	const closeMenu = () => setVisible(false)
 
 
 	const handleHousePress = (house: Partial<CombinedHouseTenantData>) => {
-		
+
 		if (house.tenants && house.tenants[0] && house.tenants[0].id) {
 			AsyncStorage.setItem('houseId', house.house?.houseId || '')
 			AsyncStorage.setItem('tenantId', house.tenants[0].id)
@@ -39,7 +43,7 @@ const HouseList = ({ house, plotName, plotId, setModalVisibility, setSelectedHou
 				plotName: plotName,
 				house: JSON.stringify(house ?? {} as Partial<CombinedHouseTenantData>)
 			}
-		})
+		})		
 	}
 
 	return (

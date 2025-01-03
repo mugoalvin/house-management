@@ -33,7 +33,7 @@ interface houseDataProps {
 	time: string
 }
 
-const housePage = () => {
+const HousePage = () => {
 	const db = useSQLiteContext()
 	const theme = useTheme()
 	const navigation = useNavigation()
@@ -241,7 +241,7 @@ const housePage = () => {
 	useFocusEffect(
 		useCallback(() => {
 			if (tenantAdded)
-			getTenantsData()
+				getTenantsData()
 			setTenantAdded(false)
 		}, [tenantAdded])
 	)
@@ -277,17 +277,17 @@ const housePage = () => {
 					<>
 						<Card>
 							{/* <Pressable> */}
-						<Pressable onPress={() => router.push('/tenantPage') }>
+							<Pressable onPress={() => router.push('/tenantPage')}>
 								<View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{houseDataDB.tenants.length != 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
-									<CustomizedText>{houseDataDB.house.houseType}</CustomizedText>
+									<CustomizedText textStyling={getCardStyle(colorScheme, theme).cardHeaderText}>{houseDataDB.tenants?.length > 0 ? 'Current Tenant' : 'Vacant House'}</CustomizedText>
+									<CustomizedText>{houseDataDB.house?.houseType}</CustomizedText>
 								</View>
 
 								{
-									houseDataDB.tenants.length != 0 &&
+									houseDataDB.tenants?.length != 0 &&
 									<View style={style.tenantInfoView}>
 										<View style={style.nameNumberView}>
-											<CustomizedText textStyling={style.name}>{`${houseDataDB.tenants[0].firstName} ${houseDataDB.tenants[0].lastName}`}</CustomizedText>
+											<CustomizedText textStyling={style.name}>{`${houseDataDB.tenants![0].firstName} ${houseDataDB.tenants[0].lastName}`}</CustomizedText>
 											<CustomizedText textStyling={style.occupation}>{houseDataDB.tenants[0].occupation}</CustomizedText>
 											<Pressable style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }} onPress={() => houseDataDB.tenants[0].contactInfo && handlePhoneClick(houseDataDB.tenants[0].contactInfo)}>
 												<Icon source='phone' size={16} />
@@ -332,7 +332,7 @@ const housePage = () => {
 									</View>
 									{
 										houseDataDB.tenants.length != 0 && houseDataDB.tenants[0].depositOwed != 0 &&
-										<PaymentProgress currentAmount={houseDataDB.house.rent - (houseDataDB.tenants[0].depositOwed ? houseDataDB.tenants[0].depositOwed : 0) } finalPrice={houseDataDB.house.rent} />
+										<PaymentProgress currentAmount={houseDataDB.house.rent - (houseDataDB.tenants[0].depositOwed ? houseDataDB.tenants[0].depositOwed : 0)} finalPrice={houseDataDB.house.rent} />
 									}
 								</Card>
 							)
@@ -406,8 +406,8 @@ const housePage = () => {
 
 			<Portal>
 				<Modal visible={modalVisibility} onDismiss={closeModal} style={{ margin: 20 }}>
-					{modalAction == 'add' && 
-					<AddTenant houseId={houseId as string} plotId={plotId as string} houseRent={houseDataDB.house.rent} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} openSnackBar={onOpenSnackBar} tenantAdded={setTenantAdded} />}
+					{modalAction == 'add' &&
+						<AddTenant houseId={houseId as string} plotId={plotId as string} houseRent={houseDataDB.house.rent} closeAddTenantModal={closeModal} setSnackbarMsg={setSnackbarMsg} openSnackBar={onOpenSnackBar} tenantAdded={setTenantAdded} />}
 					{modalAction == 'edit' && <EditTenant tenantId={houseDataDB.tenants[0].id || ''} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
 					{modalAction == 'delete' && houseDataDB.tenants[0]?.id && <DeleteTenant tenantInfo={houseDataDB.tenants[0] as tenantProps} plotId={Number(plotId)} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} onOpenSnackBar={onOpenSnackBar} />}
 					{modalAction == 'payment' && <Payment userId={userId || ''} plotId={plotId} houseData={houseData} openSnackBar={onOpenSnackBar} closeModal={closeModal} setSnackbarMsg={setSnackbarMsg} />}
@@ -425,7 +425,7 @@ const housePage = () => {
 	)
 }
 
-export default housePage
+export default HousePage
 
 
 export const getHousePageStyles = (theme: MD3Theme) => StyleSheet.create({

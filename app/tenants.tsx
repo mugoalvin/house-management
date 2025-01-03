@@ -11,7 +11,7 @@ import { tenantProps } from '@/assets/tenants'
 import { houseDataProps } from './plotPage'
 import { calculateTimeDuration } from '@/assets/values'
 
-const tenants = () => {
+const Tenants = () => {
 	const db = useSQLiteContext()
 	const theme = useTheme()
 	const colorScheme = useColorScheme() || 'dark'
@@ -72,7 +72,7 @@ const tenants = () => {
 						</View>
 					)}
 					renderItem={({ item: tenant }) => (
-						<Card cardStyle={{ marginVertical: 5 }} onPress={() => router.push({pathname: '/tenantPage', params: {tenantName: tenant.tenantName}})}>
+						<Card cardStyle={{ marginVertical: 5 }} onPress={() => router.push({ pathname: '/tenantPage', params: { tenantName: tenant.tenantName } })}>
 							<List.Item
 								title={tenant.tenantName}
 								titleStyle={{ fontFamily: 'DefaultCustomFont-ExtraBold' }}
@@ -93,7 +93,7 @@ const tenants = () => {
 	)
 }
 
-export default tenants
+export default Tenants
 
 
 const getSectionStyle = (colorScheme: string, theme: MD3Theme) => StyleSheet.create({

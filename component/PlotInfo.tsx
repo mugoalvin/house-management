@@ -101,7 +101,6 @@ const PlotInfo = ({ userId, plotData, housesTenants }: PlotInfoProps) => {
 				houseTenant.tenants.some((tenant) => tenant.rentOwed && tenant.rentOwed > 0)
 		)
 
-		console.log(filteredTenants)
 		setTenantsWithPendingPayments(filteredTenants.filter((tenant): tenant is CombinedHouseTenantData => tenant !== undefined))
 	}
 

@@ -13,7 +13,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { firestore } from '@/firebaseConfig'
 import ConfirmView from '@/component/ConfirmView'
 
-const tenantPage = () => {
+const TenantPage = () => {
 	const db = useSQLiteContext()
 	const theme = useTheme()
 	const navigation = useNavigation()
@@ -21,14 +21,14 @@ const tenantPage = () => {
 	const cardStyle = getCardStyle(colorScheme, theme)
 	const dashboardStyles = getDashboardStyle(colorScheme, theme)
 	const tenantStyle = getTenantStyle(theme)
-	
+
 	const [userId, setUserId] = useState<string>('')
 	const [plotId, setPlotId] = useState<string>('')
 	const [houseId, setHouseId] = useState<string>('')
 	const [tenantId, setTenantId] = useState<string>('')
 
 
-	const [ tenantData, setTenantData ] = useState<tenantProps>({} as tenantProps)
+	const [tenantData, setTenantData] = useState<tenantProps>({} as tenantProps)
 
 	const fetchTenantIdentifiers = async () => {
 		await AsyncStorage.getItem('userId').then((value) => setUserId(value as string))
@@ -36,7 +36,7 @@ const tenantPage = () => {
 		await AsyncStorage.getItem('houseId').then((value) => setHouseId(value as string))
 		await AsyncStorage.getItem('tenantId').then((value) => setTenantId(value as string))
 	}
-	
+
 	const getTenantInfo = async (userId: string, plotId: string, houseId: string, tenantId: string) => {
 		const tenantRef = doc(firestore, `/users/${userId}/plots/${plotId}/houses/${houseId}/tenants/${tenantId}`)
 		getDoc(tenantRef).then((doc) => {
@@ -58,7 +58,7 @@ const tenantPage = () => {
 
 	useEffect(() => {
 		if (userId !== '' && plotId !== '' && houseId !== '' && tenantId !== '')
-		getTenantInfo(userId, plotId, houseId, tenantId)
+			getTenantInfo(userId, plotId, houseId, tenantId)
 	}, [userId, plotId, houseId, tenantId])
 
 	useEffect(() => {
@@ -116,7 +116,7 @@ const tenantPage = () => {
 	)
 }
 
-export default tenantPage
+export default TenantPage
 
 const getTenantStyle = (theme: MD3Theme) => StyleSheet.create({
 	imageView: {
@@ -133,7 +133,7 @@ const getTenantStyle = (theme: MD3Theme) => StyleSheet.create({
 		fontSize: theme.fonts.titleMedium.fontSize,
 		color: theme.colors.onSurfaceDisabled,
 	},
-	varValue : {
+	varValue: {
 		flexDirection: 'row',
 		width: Dimensions.get('window').width,
 		gap: 20,

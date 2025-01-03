@@ -10,8 +10,9 @@
 			"name": "Debug Expo app",
 			"projectRoot": "${workspaceFolder}",
 			"bundlerPort": "8081",
-			"bundlerHost": "127.0.0.1"
+			"bundlerHost": "127.0.0.1",
+			"smartStep": true,
+			"skipFiles": ["<node_internals>/**", "**/node_modules/**"]
 		}
-
 	]
 }

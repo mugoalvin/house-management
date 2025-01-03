@@ -31,9 +31,6 @@ const Payment = ({ userId, plotId, houseData, closeModal, openSnackBar, setSnack
 	const [paidHouses, setPaidHouses] = useState<number>(0)
 	const [plotData, setPlotData] = useState<plotsProps>()
 
-	console.log(houseData.house)
-	console.log(houseData.tenants[0])
-
 	const handleNext = () => {
 		if (currentStep < 2) setCurrentStep(currentStep + 1);
 	}
